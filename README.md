@@ -43,6 +43,8 @@ The mod's own interface is available in English and Spanish. Native game text an
 
 ## Install
 
+> **Why are there two installers?** Both install exactly the same mod. Use **INSTALL-VDXR.cmd** when you play through Virtual Desktop/VDXR, or **INSTALL-META.cmd** when you use Meta Quest Link/Air Link. The only difference is the initial OpenXR runtime selected in the mod settings. You can change it later from the mod menu and restart the game.
+
 1. Download the beta ZIP from [Releases](../../releases).
 2. Extract the entire archive into a new folder outside the game directory.
 3. Close *Rogue Trader* completely.
