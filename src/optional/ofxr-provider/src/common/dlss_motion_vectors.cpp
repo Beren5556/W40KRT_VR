@@ -1,0 +1,539 @@
+#include "xrfg/dlss_motion_vectors.hpp"
+
+#include <algorithm>
+#include <atomic>
+#include <cmath>
+#include <mutex>
+#include <unordered_map>
+#include <vector>
+
+namespace xrfg {
+namespace {
+
+using Microsoft::WRL::ComPtr;
+
+constexpr std::uint64_t kMaximumStereoPublicationGap = 4;
+constexpr std::size_t kSnapshotSlotCount = 4;
+constexpr D3D12_RESOURCE_STATES kSnapshotReadState =
+    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
+    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+struct SnapshotSlot {
+    ComPtr<ID3D12Resource> resource;
+    D3D12_RESOURCE_DESC description{};
+    D3D12_RESOURCE_STATES state{D3D12_RESOURCE_STATE_COMMON};
+};
+
+struct StreamState {
+    std::uint64_t epoch{1};
+    std::uint64_t serial{};
+    std::uint64_t first_publication{};
+    float jitter_x{};
+    float jitter_y{};
+    std::shared_ptr<const DlssMotionVectorFrame> previous;
+    std::shared_ptr<const DlssMotionVectorFrame> latest;
+    std::array<SnapshotSlot, kSnapshotSlotCount> snapshots;
+    std::size_t next_snapshot{};
+    std::array<SnapshotSlot, kSnapshotSlotCount> depth_snapshots;
+    std::size_t next_depth_snapshot{};
+};
+
+struct Registry {
+    std::mutex mutex;
+    std::unordered_map<std::uint64_t, StreamState> streams;
+    DlssMotionVectorStatistics statistics;
+};
+
+Registry& registry() {
+    static Registry value;
+    return value;
+}
+
+std::atomic_bool g_tracking_enabled{false};
+
+ComPtr<IUnknown> identity(IUnknown* object) noexcept {
+    ComPtr<IUnknown> value;
+    if (object != nullptr) {
+        static_cast<void>(object->QueryInterface(IID_PPV_ARGS(value.GetAddressOf())));
+    }
+    return value;
+}
+
+bool same_identity(IUnknown* left, IUnknown* right) noexcept {
+    const auto a = identity(left);
+    const auto b = identity(right);
+    return a && b && a.Get() == b.Get();
+}
+
+bool valid(const DlssMotionVectorPublication& publication) noexcept {
+    if (publication.stream == 0 || publication.output == nullptr ||
+        publication.motion_vectors == nullptr ||
+        publication.producer_queue == nullptr ||
+        publication.producer_command_list == nullptr || publication.output_width == 0 ||
+        publication.output_height == 0 || publication.motion_width == 0 ||
+        publication.motion_height == 0 || !std::isfinite(publication.scale_x) ||
+        !std::isfinite(publication.scale_y) || !std::isfinite(publication.jitter_x) ||
+        !std::isfinite(publication.jitter_y)) {
+        return false;
+    }
+    const auto output = publication.output->GetDesc();
+    const auto motion = publication.motion_vectors->GetDesc();
+    const bool base_valid = output.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D &&
+        motion.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D &&
+        static_cast<std::uint64_t>(publication.output_x) + publication.output_width <=
+            output.Width &&
+        static_cast<std::uint64_t>(publication.output_y) + publication.output_height <=
+            output.Height &&
+        static_cast<std::uint64_t>(publication.motion_x) + publication.motion_width <=
+            motion.Width &&
+        static_cast<std::uint64_t>(publication.motion_y) + publication.motion_height <=
+            motion.Height;
+    if (!base_valid || publication.depth == nullptr) return base_valid;
+    const auto depth = publication.depth->GetDesc();
+    return depth.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D &&
+        publication.depth_width != 0 && publication.depth_height != 0 &&
+        static_cast<std::uint64_t>(publication.depth_x) + publication.depth_width <=
+            depth.Width &&
+        static_cast<std::uint64_t>(publication.depth_y) + publication.depth_height <=
+            depth.Height &&
+        std::isfinite(publication.frame_time_delta_ms) &&
+        publication.frame_time_delta_ms > 0.0F &&
+        std::isfinite(publication.camera_near) &&
+        std::isfinite(publication.camera_far);
+}
+
+bool matching_description(
+    const D3D12_RESOURCE_DESC& left,
+    const D3D12_RESOURCE_DESC& right) noexcept {
+    return left.Dimension == right.Dimension && left.Alignment == right.Alignment &&
+        left.Width == right.Width && left.Height == right.Height &&
+        left.DepthOrArraySize == right.DepthOrArraySize &&
+        left.MipLevels == right.MipLevels && left.Format == right.Format &&
+        left.SampleDesc.Count == right.SampleDesc.Count &&
+        left.SampleDesc.Quality == right.SampleDesc.Quality &&
+        left.Layout == right.Layout && left.Flags == right.Flags;
+}
+
+D3D12_RESOURCE_BARRIER transition_barrier(
+    ID3D12Resource* resource,
+    D3D12_RESOURCE_STATES before,
+    D3D12_RESOURCE_STATES after) noexcept {
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = resource;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = before;
+    barrier.Transition.StateAfter = after;
+    return barrier;
+}
+
+HRESULT snapshot_resource(
+    std::array<SnapshotSlot, kSnapshotSlotCount>& snapshots,
+    std::size_t& next_snapshot,
+    ID3D12Resource* source,
+    D3D12_RESOURCE_STATES source_state,
+    ID3D12GraphicsCommandList* producer_command_list,
+    ID3D12CommandQueue* producer_queue,
+    ID3D12Device* verified_producer_device,
+    ComPtr<ID3D12Resource>* snapshot) noexcept {
+    if (source == nullptr || producer_command_list == nullptr ||
+        producer_queue == nullptr || snapshot == nullptr) return E_POINTER;
+    snapshot->Reset();
+
+    ComPtr<ID3D12Device> source_device;
+    ComPtr<ID3D12Device> command_device;
+    ComPtr<ID3D12Device> queue_device;
+    HRESULT result = source->GetDevice(
+        IID_PPV_ARGS(source_device.GetAddressOf()));
+    if (FAILED(result)) return result;
+    result = producer_command_list->GetDevice(
+        IID_PPV_ARGS(command_device.GetAddressOf()));
+    if (FAILED(result)) return result;
+    result = producer_queue->GetDevice(
+        IID_PPV_ARGS(queue_device.GetAddressOf()));
+    if (FAILED(result)) return result;
+    ComPtr<ID3D12Device> allocation_device;
+    if (verified_producer_device != nullptr) {
+        // The producer has already unwrapped and identity-checked all related
+        // objects. Comparing their reported wrapper devices here would
+        // recreate the Streamline false mismatch this field avoids.
+        allocation_device = verified_producer_device;
+    } else {
+        if (!same_identity(source_device.Get(), command_device.Get()) ||
+            !same_identity(source_device.Get(), queue_device.Get())) {
+            return E_INVALIDARG;
+        }
+        allocation_device = source_device;
+    }
+
+    const D3D12_RESOURCE_DESC description = source->GetDesc();
+    SnapshotSlot& slot = snapshots[next_snapshot];
+    if (!slot.resource || !matching_description(slot.description, description)) {
+        D3D12_HEAP_PROPERTIES properties{};
+        properties.Type = D3D12_HEAP_TYPE_DEFAULT;
+        properties.CreationNodeMask = 1;
+        properties.VisibleNodeMask = 1;
+        ComPtr<ID3D12Resource> resource;
+        result = allocation_device->CreateCommittedResource(
+            &properties,
+            D3D12_HEAP_FLAG_NONE,
+            &description,
+            D3D12_RESOURCE_STATE_COMMON,
+            nullptr,
+            IID_PPV_ARGS(resource.GetAddressOf()));
+        if (FAILED(result)) return result;
+        slot.resource = std::move(resource);
+        slot.description = description;
+        slot.state = D3D12_RESOURCE_STATE_COMMON;
+    }
+
+    std::array<D3D12_RESOURCE_BARRIER, 2> before{};
+    UINT before_count = 0;
+    if (source_state != D3D12_RESOURCE_STATE_COPY_SOURCE) {
+        before[before_count++] = transition_barrier(
+            source,
+            source_state,
+            D3D12_RESOURCE_STATE_COPY_SOURCE);
+    }
+    if (slot.state != D3D12_RESOURCE_STATE_COPY_DEST) {
+        before[before_count++] = transition_barrier(
+            slot.resource.Get(), slot.state, D3D12_RESOURCE_STATE_COPY_DEST);
+    }
+    if (before_count != 0) {
+        producer_command_list->ResourceBarrier(before_count, before.data());
+    }
+    producer_command_list->CopyResource(slot.resource.Get(), source);
+
+    std::array<D3D12_RESOURCE_BARRIER, 2> after{};
+    UINT after_count = 0;
+    if (source_state != D3D12_RESOURCE_STATE_COPY_SOURCE) {
+        after[after_count++] = transition_barrier(
+            source,
+            D3D12_RESOURCE_STATE_COPY_SOURCE,
+            source_state);
+    }
+    after[after_count++] = transition_barrier(
+        slot.resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, kSnapshotReadState);
+    producer_command_list->ResourceBarrier(after_count, after.data());
+    slot.state = kSnapshotReadState;
+    *snapshot = slot.resource;
+    next_snapshot = (next_snapshot + 1) % kSnapshotSlotCount;
+    return S_OK;
+}
+
+struct Candidate {
+    std::uint64_t first_publication{};
+    std::shared_ptr<const DlssMotionVectorFrame> frame;
+    std::shared_ptr<const DlssMotionVectorFrame> previous;
+};
+
+}  // namespace
+
+void publish_dlss_motion_vectors(
+    const DlssMotionVectorPublication& publication) noexcept {
+    try {
+        if (!g_tracking_enabled.load(std::memory_order_acquire)) return;
+        auto& state = registry();
+        std::scoped_lock lock(state.mutex);
+        if (!valid(publication)) {
+            ++state.statistics.invalid_publications;
+            state.statistics.status = DlssMotionVectorStatus::invalid_input;
+            return;
+        }
+
+        auto& stream = state.streams[publication.stream];
+        if (publication.reset) {
+            ++stream.epoch;
+            stream.serial = 0;
+            stream.previous.reset();
+            stream.latest.reset();
+        }
+
+        ComPtr<ID3D12Resource> motion_snapshot;
+        if (FAILED(snapshot_resource(stream.snapshots, stream.next_snapshot,
+                publication.motion_vectors, publication.resource_state,
+                publication.producer_command_list, publication.producer_queue,
+                publication.verified_producer_device,
+                &motion_snapshot))) {
+            ++state.statistics.snapshot_failures;
+            state.statistics.status = DlssMotionVectorStatus::invalid_input;
+            return;
+        }
+        ++state.statistics.snapshot_copies;
+
+        ComPtr<ID3D12Resource> depth_snapshot;
+        if (publication.depth != nullptr) {
+            if (FAILED(snapshot_resource(stream.depth_snapshots,
+                    stream.next_depth_snapshot, publication.depth,
+                    publication.depth_resource_state,
+                    publication.producer_command_list,
+                    publication.producer_queue,
+                    publication.verified_producer_device, &depth_snapshot))) {
+                ++state.statistics.snapshot_failures;
+                state.statistics.status = DlssMotionVectorStatus::invalid_input;
+                return;
+            }
+            ++state.statistics.snapshot_copies;
+            ++state.statistics.depth_publications;
+        }
+
+        auto frame = std::make_shared<DlssMotionVectorFrame>();
+        frame->stream = publication.stream;
+        frame->epoch = stream.epoch;
+        frame->previous_serial = stream.serial;
+        frame->serial = ++stream.serial;
+        frame->publication = ++state.statistics.published;
+        frame->output = publication.output;
+        frame->motion_vectors = std::move(motion_snapshot);
+        frame->producer_queue = publication.producer_queue;
+        frame->output_x = publication.output_x;
+        frame->output_y = publication.output_y;
+        frame->output_width = publication.output_width;
+        frame->output_height = publication.output_height;
+        frame->output_slice = 0;
+        frame->motion_x = publication.motion_x;
+        frame->motion_y = publication.motion_y;
+        frame->motion_width = publication.motion_width;
+        frame->motion_height = publication.motion_height;
+        frame->motion_slice = 0;
+        frame->scale_x = publication.scale_x == 0.0F ? 1.0F : publication.scale_x;
+        frame->scale_y = publication.scale_y == 0.0F ? 1.0F : publication.scale_y;
+        frame->jitter_x = publication.jitter_x;
+        frame->jitter_y = publication.jitter_y;
+        frame->previous_jitter_x = stream.jitter_x;
+        frame->previous_jitter_y = stream.jitter_y;
+        frame->resource_state = kSnapshotReadState;
+        frame->jittered = publication.jittered;
+        frame->reset = publication.reset;
+        frame->depth = std::move(depth_snapshot);
+        frame->depth_x = publication.depth_x;
+        frame->depth_y = publication.depth_y;
+        frame->depth_width = publication.depth_width;
+        frame->depth_height = publication.depth_height;
+        frame->depth_resource_state = kSnapshotReadState;
+        frame->frame_time_delta_ms = publication.frame_time_delta_ms;
+        frame->camera_near = publication.camera_near;
+        frame->camera_far = publication.camera_far;
+        frame->depth_inverted = publication.depth_inverted;
+        frame->depth_infinite = publication.depth_infinite;
+        stream.jitter_x = publication.jitter_x;
+        stream.jitter_y = publication.jitter_y;
+        if (stream.first_publication == 0) {
+            stream.first_publication = frame->publication;
+        }
+        stream.previous = std::move(stream.latest);
+        stream.latest = std::move(frame);
+        if (state.statistics.used == 0) {
+            state.statistics.status = DlssMotionVectorStatus::output_not_direct;
+        }
+    } catch (...) {
+        report_dlss_motion_vector_status(DlssMotionVectorStatus::invalid_input);
+    }
+}
+
+void configure_dlss_motion_vector_tracking(bool enabled) noexcept {
+    const bool previous = g_tracking_enabled.exchange(enabled, std::memory_order_acq_rel);
+    if (enabled == previous) return;
+    try {
+        auto& state = registry();
+        std::scoped_lock lock(state.mutex);
+        if (!enabled) {
+            // Do not release the private resources here. The desired setting is
+            // visible to DLSS before the OpenXR layer reaches xrEndFrame and its
+            // GPU-idle fence, so snapshots may still be referenced by submitted
+            // synthesis work. The layer retires them explicitly after that fence.
+            state.statistics.status = DlssMotionVectorStatus::disabled;
+            return;
+        }
+        // Re-enabling without a layer-side retirement must not expose stale
+        // vectors. Preserve the slot resources (and therefore any in-flight GPU
+        // lifetime), but start fresh stream epochs and temporal ownership.
+        for (auto& [unused_stream_id, stream] : state.streams) {
+            static_cast<void>(unused_stream_id);
+            ++stream.epoch;
+            stream.serial = 0;
+            stream.first_publication = 0;
+            stream.jitter_x = 0.0F;
+            stream.jitter_y = 0.0F;
+            stream.previous.reset();
+            stream.latest.reset();
+        }
+        state.statistics = {};
+        state.statistics.status = DlssMotionVectorStatus::waiting_for_dlss;
+    } catch (...) {
+    }
+}
+
+void retire_disabled_dlss_motion_vector_resources() noexcept {
+    try {
+        auto& state = registry();
+        std::scoped_lock lock(state.mutex);
+        if (g_tracking_enabled.load(std::memory_order_acquire)) return;
+        state.streams.clear();
+        state.statistics = {};
+        state.statistics.status = DlssMotionVectorStatus::disabled;
+    } catch (...) {
+    }
+}
+
+void retire_dlss_motion_vector_stream(std::uint64_t stream) noexcept {
+    try {
+        auto& state = registry();
+        std::scoped_lock lock(state.mutex);
+        state.streams.erase(stream);
+    } catch (...) {
+    }
+}
+
+std::shared_ptr<const DlssMotionVectorSet> resolve_dlss_motion_vectors(
+    ID3D12Resource* output,
+    ID3D12CommandQueue* consumer_queue) noexcept {
+    try {
+        if (!g_tracking_enabled.load(std::memory_order_acquire)) {
+            report_dlss_motion_vector_status(DlssMotionVectorStatus::disabled);
+            return {};
+        }
+        auto& state = registry();
+        std::scoped_lock lock(state.mutex);
+        ++state.statistics.resolve_calls;
+        if (output == nullptr || consumer_queue == nullptr) {
+            ++state.statistics.invalid_rejections;
+            state.statistics.status = DlssMotionVectorStatus::invalid_input;
+            return {};
+        }
+
+        const auto description = output->GetDesc();
+        if (description.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D) {
+            ++state.statistics.invalid_rejections;
+            state.statistics.status = DlssMotionVectorStatus::invalid_input;
+            return {};
+        }
+        const std::uint32_t eye_count = std::min<std::uint32_t>(
+            std::max<std::uint32_t>(description.DepthOrArraySize, 1U),
+            kDlssMotionVectorEyeCount);
+
+        std::vector<Candidate> candidates;
+        std::uint32_t streams_with_frames = 0;
+        candidates.reserve(state.streams.size());
+        for (const auto& [unused_stream_id, stream] : state.streams) {
+            static_cast<void>(unused_stream_id);
+            if (!stream.latest) continue;
+            ++streams_with_frames;
+            if (same_identity(stream.latest->producer_queue.Get(), consumer_queue)) {
+                candidates.push_back(
+                    {stream.first_publication, stream.latest, stream.previous});
+            }
+        }
+
+        // Alternating-eye renderers such as Ghost of Tsushima's AER path reuse
+        // one DLSS handle for both eyes. A complete stereo guide set therefore
+        // consists of two consecutive publications from that single stream.
+        // Even local serials close the stable eye-0/eye-1 pair; odd serials are
+        // deliberately left pending until the second eye arrives.
+        if (eye_count == 2 && candidates.size() == 1) {
+            const auto& current = candidates.front().frame;
+            const auto& previous = candidates.front().previous;
+            if (previous && current->stream == previous->stream &&
+                current->epoch == previous->epoch &&
+                current->serial == previous->serial + 1 &&
+                (current->serial & 1U) == 0 &&
+                current->publication > previous->publication &&
+                current->publication - previous->publication <=
+                    kMaximumStereoPublicationGap &&
+                same_identity(previous->producer_queue.Get(), consumer_queue)) {
+                auto left = std::make_shared<DlssMotionVectorFrame>(*previous);
+                auto right = std::make_shared<DlssMotionVectorFrame>(*current);
+                left->previous_serial = left->serial > 2 ? left->serial - 2 : 0;
+                right->previous_serial = right->serial > 2 ? right->serial - 2 : 0;
+                auto result = std::make_shared<DlssMotionVectorSet>();
+                result->eye_count = 2;
+                result->eyes[0] = std::move(left);
+                result->eyes[1] = std::move(right);
+                ++state.statistics.matched;
+                return result;
+            }
+        }
+
+        if (candidates.size() < eye_count) {
+            if (streams_with_frames >= eye_count) {
+                ++state.statistics.resolve_queue_mismatches;
+                state.statistics.status = DlssMotionVectorStatus::queue_mismatch;
+            } else {
+                ++state.statistics.resolve_missing_streams;
+                state.statistics.status = state.statistics.published == 0
+                    ? DlssMotionVectorStatus::waiting_for_dlss
+                    : DlssMotionVectorStatus::output_not_direct;
+            }
+            return {};
+        }
+
+        std::sort(candidates.begin(), candidates.end(), [](const Candidate& a,
+                                                           const Candidate& b) {
+            return a.frame->publication > b.frame->publication;
+        });
+        candidates.resize(eye_count);
+        const auto newest = candidates.front().frame->publication;
+        const auto oldest = candidates.back().frame->publication;
+        if (newest < oldest || newest - oldest > kMaximumStereoPublicationGap) {
+            ++state.statistics.resolve_stale_pairs;
+            state.statistics.status = DlssMotionVectorStatus::temporal_mismatch;
+            return {};
+        }
+
+        // Stable first-seen stream order defines eye order. This survives any
+        // post-DLSS shader passes because the association follows the two DLSS
+        // evaluation streams rather than the final color resource identity.
+        std::sort(candidates.begin(), candidates.end(), [](const Candidate& a,
+                                                           const Candidate& b) {
+            return a.first_publication < b.first_publication;
+        });
+
+        auto result = std::make_shared<DlssMotionVectorSet>();
+        result->eye_count = eye_count;
+        for (std::uint32_t eye = 0; eye < eye_count; ++eye) {
+            result->eyes[eye] = candidates[eye].frame;
+        }
+        ++state.statistics.matched;
+        return result;
+    } catch (...) {
+        report_dlss_motion_vector_status(DlssMotionVectorStatus::invalid_input);
+        return {};
+    }
+}
+
+void report_dlss_motion_vector_status(DlssMotionVectorStatus status) noexcept {
+    try {
+        auto& state = registry();
+        std::scoped_lock lock(state.mutex);
+        if (status == DlssMotionVectorStatus::temporal_mismatch) {
+            ++state.statistics.temporal_rejections;
+        } else if (status == DlssMotionVectorStatus::invalid_input) {
+            ++state.statistics.invalid_rejections;
+        }
+        state.statistics.status = status;
+    } catch (...) {
+    }
+}
+
+void report_dlss_motion_vector_use() noexcept {
+    try {
+        auto& state = registry();
+        std::scoped_lock lock(state.mutex);
+        ++state.statistics.used;
+        state.statistics.last_used_publication = state.statistics.published;
+        state.statistics.status = DlssMotionVectorStatus::used;
+    } catch (...) {
+    }
+}
+
+DlssMotionVectorStatistics dlss_motion_vector_statistics() noexcept {
+    try {
+        auto& state = registry();
+        std::scoped_lock lock(state.mutex);
+        return state.statistics;
+    } catch (...) {
+        return {};
+    }
+}
+
+}  // namespace xrfg

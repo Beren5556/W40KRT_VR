@@ -1,0 +1,42 @@
+# Build output
+build/
+out/
+bin/
+obj/
+*.dll
+*.exe
+*.lib
+*.pdb
+*.ilk
+
+# Local SDKs and game files
+third_party/
+game/
+external/FidelityFX-SDK*/
+
+# User and diagnostic data
+*.log
+*.cfg
+*.user
+*.suo
+.vs/
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Internal/upstream development material not needed for this distribution
+src/optional/ofxr-provider/.github/
+src/optional/ofxr-provider/docs/releases/
+src/optional/ofxr-provider/docs/DIAGNOSTICS.md
+src/optional/ofxr-provider/docs/FPS_OVERLAY.md
+src/optional/ofxr-provider/docs/PR3_INTEGRATION.md
+src/optional/ofxr-provider/tests/
+src/optional/ofxr-provider/scripts/
+src/native/core/neural/tests/
+src/native/core/neural/Smoke.cpp
+src/native/core/neural/Verify.ps1
+src/native/core/neural/README.md
+src/managed/RTMaquetaXR/NOTICE.txt

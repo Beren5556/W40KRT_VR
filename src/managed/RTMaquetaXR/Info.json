@@ -1,0 +1,8 @@
+{
+  "Id": "RTMaquetaXR",
+  "DisplayName": "Maqueta VR - OpenXR / VDXR / Meta Link (experimental)",
+  "Version": "0.9.79",
+  "ManagerVersion": "0.25.0",
+  "AssemblyName": "RTMaquetaXR.dll",
+  "EntryMethod": "RTMaquetaXR.Main.Load"
+}

@@ -1,0 +1,14 @@
+using System.Collections.Generic;
+namespace RTMaquetaXR { internal static partial class ModLocalization {
+    static partial void AddRelease57(Dictionary<string,string> d) {
+        Add(d,"Configuration saved","Configuración guardada");
+        Add(d,"Minimal effects during combat","Efectos mínimos en combate");
+        Add(d,"Minimal in combat","Mínimo en combate");
+        Add(d,"Automatically use Minimal engine effects during ground and space combat, including preparation. Restore your selected effect level afterwards. Off by default. Keeps tactical indicators, particles and game rules. Does not change saved graphics settings.","Aplica efectos mínimos del motor en Combates terrestres y Combate espacial, incluida la preparación. Después recupera el nivel que tengas elegido. Desactivado por defecto. Conserva indicadores tácticos, partículas y reglas del juego. No modifica los ajustes gráficos guardados.");
+        Add(d,"Smoothly follow characters moved with the right stick. Forward, backward and sideways movement follow the right controller aiming direction at departure; turning your wrist steers. Camera follow cannot feed its rotation back into movement. Centre the stick to establish a new aiming reference. Off keeps the table still.","Sigue suavemente a los personajes que mueves con el stick derecho. El apuntado del Touch derecho al iniciar el movimiento orienta avance, retroceso y desplazamiento lateral; girar la muñeca cambia el rumbo. El giro automático de cámara no altera esa referencia. Centra el stick para establecer una nueva. Desactivado mantiene quieta la maqueta.");
+        Add(d,"Right stick + right controller aim","Stick derecho + apuntado derecho");
+        Add(d,"Exploration: move relative to right aim. Maps: pan.","Exploración: mover según apuntado derecho. Mapas: desplazar.");
+        Add(d,"In On-foot exploration, the right controller aim at departure defines forward, backward and sideways movement with the right stick. Turn your wrist to steer. Camera follow does not change that movement reference; centre the stick to establish a new one. HUD hover does not stop movement; clicks and open menus do. Navigation maps keep right-stick panning and left-stick zoom. Combat keeps native tactical pointer orders.","En Exploración a pie, el apuntado del Touch derecho al iniciar el movimiento define avance, retroceso y desplazamiento lateral con el stick derecho. Gira la muñeca para cambiar el rumbo. El seguimiento de cámara no altera esa referencia; centra el stick para establecer otra. Pasar sobre el HUD no detiene al grupo; pulsarlo o abrir menús sí. En los mapas se mantiene el desplazamiento con stick derecho y el zoom con izquierdo. En combate se conservan las órdenes tácticas con el puntero.");
+        Add(d,"Waiting for a valid horizontal right-controller aim","Esperando un apuntado horizontal válido del Touch derecho");
+    }
+}}

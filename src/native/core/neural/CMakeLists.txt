@@ -1,0 +1,18 @@
+cmake_minimum_required(VERSION 3.20)
+project(RTNeural LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(NGX_SDK "${CMAKE_CURRENT_LIST_DIR}/../../third_party/NVIDIA-DLSS-310.9.1")
+add_library(RTNeural SHARED Neural.cpp Neural.h ColorTransfer.h)
+target_compile_definitions(RTNeural PRIVATE RTNeural_EXPORTS WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+target_compile_options(RTNeural PRIVATE /W4 /EHsc /utf-8)
+target_include_directories(RTNeural PRIVATE "${NGX_SDK}/include")
+target_link_libraries(RTNeural PRIVATE "${NGX_SDK}/lib/Windows_x86_64/x64/nvsdk_ngx_d.lib" d3d11 d3dcompiler dxgi dxguid version psapi)
+add_executable(NeuralSmokeTest Smoke.cpp)
+set_target_properties(NeuralSmokeTest PROPERTIES OUTPUT_NAME DlssD3D11Probe)
+target_compile_definitions(NeuralSmokeTest PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+target_compile_options(NeuralSmokeTest PRIVATE /W4 /EHsc /utf-8)
+target_link_libraries(NeuralSmokeTest PRIVATE RTNeural d3d11 d3dcompiler dxgi dxguid)
+add_custom_command(TARGET NeuralSmokeTest POST_BUILD
+ COMMAND ${CMAKE_COMMAND} -E copy_if_different "${NGX_SDK}/lib/Windows_x86_64/rel/nvngx_dlss.dll" "$<TARGET_FILE_DIR:NeuralSmokeTest>/nvngx_dlss.dll"
+ COMMAND ${CMAKE_COMMAND} -E copy_if_different "${NGX_SDK}/LICENSE.txt" "$<TARGET_FILE_DIR:NeuralSmokeTest>/NVIDIA-LICENSE.txt")
