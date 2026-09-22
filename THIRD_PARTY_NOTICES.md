@@ -22,7 +22,7 @@ The optional OFXR provider uses the public D3D12 interface headers from NVIDIA O
 
 ## Optional OFXR provider
 
-The optional OFXR provider is distributed under **LGPL-3.0-or-later**. Its corresponding source is included under [`src/optional/ofxr-provider`](src/optional/ofxr-provider), together with its license and build information.
+The optional provider is based on **[OFXR Bridge](https://github.com/tig3rmast3r/OFXR-Bridge), created by tig3rmast3r**, and is distributed under **LGPL-3.0-or-later**. Its corresponding source and W40KRT_VR modifications are included under [`src/optional/ofxr-provider`](src/optional/ofxr-provider), together with its license and build information.
 
 The provider uses AMD FidelityFX SDK Optical Flow components under AMD's MIT License. FidelityFX source is a build-time input and is not included in this repository; the required upstream version is documented with the provider source.
 

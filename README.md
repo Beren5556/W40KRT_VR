@@ -151,8 +151,11 @@ Without that initial work, substantially more time would have been required to i
 
 Building on that foundation, W40KRT_VR develops its own tabletop approach inspired by **Demeo**: a direct OpenXR bridge for VDXR and Meta Quest Link, full headset tracking, Touch controls and gestures, multiple camera perspectives, and extensive interface, comfort, and rendering work.
 
+The experimental frame-generation mode is based on **[OFXR Bridge](https://github.com/tig3rmast3r/OFXR-Bridge), created by tig3rmast3r** and released under LGPL-3.0-or-later. Many thanks to tig3rmast3r for creating OFXR Bridge and sharing its source with the VR community. W40KRT_VR adapts and integrates that technology as an optional, game-specific component that is disabled by default.
+
 - [RTVR on Nexus Mods](https://www.nexusmods.com/warhammer40kroguetrader/mods/518)
 - [SolemnScribe's source code](https://github.com/SolemnScribe/rogue-trader-and-pathfinder-vr)
+- [OFXR Bridge by tig3rmast3r](https://github.com/tig3rmast3r/OFXR-Bridge)
 
 ## License and intellectual property
 

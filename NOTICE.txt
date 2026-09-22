@@ -20,7 +20,10 @@ NVIDIA DLSS SDK and signed runtime 310.9.1.0:
   NVIDIA components are not covered by the W40KRT_VR MIT License.
 
 Optional OFXR provider:
-  LGPL-3.0-or-later; corresponding source is included in this repository.
+  Based on OFXR Bridge, created by tig3rmast3r.
+  https://github.com/tig3rmast3r/OFXR-Bridge
+  LGPL-3.0-or-later; corresponding source and W40KRT_VR modifications are
+  included in this repository.
   Uses Khronos OpenXR headers, AMD FidelityFX SDK Optical Flow components
   under the AMD MIT License, and public NVIDIA Optical Flow interface headers
   under their retained permission notice. Full notices accompany the source
