@@ -125,7 +125,7 @@ The mod includes contextual help and an illustrated in-game control guide. A sep
 
 ## Beta status
 
-This is the first private beta of W40KRT_VR. Performance can vary during combat and complex scenes, and untested hardware or game situations may expose additional issues.
+This is the first public beta of W40KRT_VR. Performance can vary during combat and complex scenes, and untested hardware or game situations may expose additional issues.
 
 This is a personal project without formal technical support. Experiences and questions may be discussed in community forums, without a commitment by the author to respond, investigate, or provide fixes.
 
