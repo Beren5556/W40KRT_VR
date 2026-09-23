@@ -10,7 +10,7 @@ namespace RTMaquetaXR
             MarkSettingsDirty(); SaveSettings(); // Persist before the requested restart.
         }
         static OverlayOption OpenXrRuntimeOption() => ImageValue("OpenXR runtime",
-            "Choose Virtual Desktop (VDXR) or Meta Quest Link / Air Link. Requires restarting the game. Does not change the Windows default runtime, headset refresh or graphics settings. Connect through the selected PC application before launching.",
-            OpenXrRuntimeValue, direction => SelectOpenXrRuntime(1 - OpenXrRuntimeSelection.Normalize(_cfg.openXrRuntime)));
+            "Choose Virtual Desktop (VDXR), Meta Quest Link / Air Link, or Pimax OpenXR. PICO uses VDXR. Restart the game after changing runtime. Connect the headset through its PC application first. Windows runtime and graphics settings stay unchanged.",
+            OpenXrRuntimeValue, direction => SelectOpenXrRuntime(CycleImageValue(OpenXrRuntimeSelection.Normalize(_cfg.openXrRuntime),direction,3)));
     }
 }

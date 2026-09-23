@@ -93,12 +93,14 @@ namespace RTMaquetaXR
                 if (!blocked) { DestroyStartupVrGateCanvas(); return; }
                 if (_startupVrGateCanvas == null) CreateStartupVrGateCanvas();
                 string status = OpenXR.Status ?? "";
+                if ((Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && Input.GetKeyDown(KeyCode.C))
+                    GUIUtility.systemCopyBuffer = "RTMaquetaXR " + BuildTag + "\n" + OpenXrRuntime.Name + "\n" + status;
                 if (_startupVrGateLanguage != ModLocalization.Revision || status != _startupVrGateStatus)
                 {
                     _startupVrGateLanguage = ModLocalization.Revision; _startupVrGateStatus = status;
                     _startupVrGateTitle.text = ModLocalization.Text("PREPARING VR");
                     _startupVrGateBody.text = ModLocalization.Text(OpenXrRuntime.WaitingText) +
-                        "\n\n" + ModLocalization.DiagnosticText(status);
+                        "\n\n" + ModLocalization.DiagnosticText(status) + "\n\n" + ModLocalization.Text("Ctrl+C: copy startup details");
                 }
             }
             catch (Exception error)

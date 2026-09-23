@@ -1,4 +1,4 @@
-W40KRT_VR 0.9.79 beta
+W40KRT_VR 0.9.80 beta
 
 Original W40KRT_VR code:
   Copyright (c) 2026 Beren5556. MIT License; see LICENSE.

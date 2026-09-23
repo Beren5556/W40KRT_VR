@@ -33,7 +33,7 @@ namespace RTMaquetaXR
     {
         // Hardcoded in the source, so it travels with the compiled DLL. The load line logs this next to
         // Info.json's Version; if the two disagree in the log, the running DLL is stale (rebuild needed).
-        const string BuildTag = "0.9.79";
+        const string BuildTag = "0.9.80";
         static ModDiagnosticLog _log;
         static string _settingsPath;
         static readonly string[] _presetPaths = new string[3];                       // one snapshot file per slot
@@ -115,14 +115,17 @@ namespace RTMaquetaXR
         {
             public ComfortCameraSettings comfort = new ComfortCameraSettings();
             public int openXrRuntime = 0; // 0 VDXR, 1 Meta Quest Link; applied at process startup.
+            public string openXrRuntimeManifest80 = "";
             public int modLanguage = -1; // Follow game: esES -> Spanish; every other locale -> English.
-            public float worldScale  = 10.0f;
+            public float worldScale  = ApprovedUserDefaults.WorldScale;
             public float ipdScale    = 1.0f;
             public bool  includeRoll = true;
             public bool  uiEnabled   = true;
             public bool touchGestureHelp = false;
             public bool touchHandsVisible = true;
             public bool touchThirdPersonFollow = true;
+            public bool touchFollowRecenter = false;
+            public float modMenuOffsetX = 0, modMenuOffsetY = 0;
             public bool touchContextHints = false;
             public float touchHintX = 0, touchHintY = 0, touchHintSize = 1f;
             public int controlsLayoutRevision = 0;
@@ -191,6 +194,7 @@ namespace RTMaquetaXR
             // Per-canvas placement overrides (panel-fraction centre, 0..1, y up), keyed by canvas name.
             // Empty = use the registered defaults. Edited via the settings selector; persisted as pos.<name> lines.
             public Dictionary<string, Vector2> uiPos = new Dictionary<string, Vector2>();
+            public Settings() { ApprovedLayout80.CopyTo(this, true); }
         }
 
         [DllImport("kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
@@ -213,13 +217,15 @@ namespace RTMaquetaXR
 
         public static bool Load(UnityModManager.ModEntry modEntry)
         {
+            // Decide before settings migration, callbacks, patches or OpenXR setup.
+            if (!_launcherVrRequested) return true;
             _log = new ModDiagnosticLog(modEntry.Logger.Log, modEntry.Logger.Error);
             SettingsFiles76.Migrate(modEntry.Path, _presetPaths.Length);
             DiagnosticsDefaults77.Migrate(modEntry.Path, _presetPaths.Length);
             _settingsPath = SettingsFiles76.PathFor(modEntry.Path, "settings");
             for (int i = 0; i < _presetPaths.Length; i++) _presetPaths[i] = SettingsFiles76.PathFor(modEntry.Path, "view" + (i + 1));
             LoadSettings();
-            OpenXrRuntime.CaptureStartup(_cfg.openXrRuntime);
+            OpenXrRuntime.CaptureStartup(_cfg.openXrRuntime,_cfg.openXrRuntimeManifest80);
             ApplyAllDiagnosticsSetting();
             CaptureEngineCadenceStartup();
             CaptureEngineOptimizations58();
@@ -276,7 +282,7 @@ namespace RTMaquetaXR
         static void OnGUI(UnityModManager.ModEntry modEntry)
         {
             GUILayout.Label(ModLocalization.Text("Tabletop VR Â· OpenXR Â· experimental ") + BuildTag);
-            if (GUILayout.Button(ModLocalization.Text("OpenXR runtime") + ": " + OpenXrRuntimeValue())) SelectOpenXrRuntime(1 - _cfg.openXrRuntime);
+            if (GUILayout.Button(ModLocalization.Text("OpenXR runtime") + ": " + OpenXrRuntimeValue())) SelectOpenXrRuntime((OpenXrRuntimeSelection.Normalize(_cfg.openXrRuntime) + 1) % 3);
             GUILayout.Label(ModLocalization.Format("Current runtime: {0}. Changes require restarting the game.", OpenXrRuntime.Name));
             GUILayout.Label(ModLocalization.DiagnosticText(OpenXR.Status));
             if (GUILayout.Button(_active ? ModLocalization.Text("Stop VR") : ModLocalization.Text("Start VR")))
@@ -648,6 +654,10 @@ namespace RTMaquetaXR
                 else if (key == "drawDistanceCustom" && float.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out var dc)) cfg.drawDistanceCustom = DrawDistanceOptions.SanitizeCustom(dc);
                 else if (key == "touchDrawDistanceShortcut" && bool.TryParse(val, out var tds)) cfg.touchDrawDistanceShortcut = tds;
                 else if (key == "touchThirdPersonFollow" && bool.TryParse(val, out var tpf)) cfg.touchThirdPersonFollow = tpf;
+                else if (key == "touchFollowRecenter" && bool.TryParse(val, out var tr80)) cfg.touchFollowRecenter = tr80;
+                else if (key == "openXrRuntimeManifest80") cfg.openXrRuntimeManifest80 = val;
+                else if (key == "modMenuOffsetX" && float.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out var mx80)) cfg.modMenuOffsetX = mx80;
+                else if (key == "modMenuOffsetY" && float.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out var my80)) cfg.modMenuOffsetY = my80;
                 else if (key == "openXrRuntime" && int.TryParse(val, out var oxr)) cfg.openXrRuntime = OpenXrRuntimeSelection.Normalize(oxr);
                 else if (key == "modLanguage" && int.TryParse(val, out var ml)) cfg.modLanguage = Math.Max(-1, Math.Min(1, ml));
                 else if (key == "adaptiveDistance" && bool.TryParse(val, out var ad)) cfg.adaptiveDistance = ad;
@@ -689,6 +699,8 @@ namespace RTMaquetaXR
             cfg.uiMenuOffsetX = TouchPointerMath.Finite(cfg.uiMenuOffsetX) ? Mathf.Clamp(cfg.uiMenuOffsetX, -.65f, .65f) : ApprovedUserDefaults.MenuX;
             cfg.uiMenuOffsetY = TouchPointerMath.Finite(cfg.uiMenuOffsetY) ? Mathf.Clamp(cfg.uiMenuOffsetY, -.65f, .65f) : ApprovedUserDefaults.MenuY;
             SpatialPanelSettings.Normalize(cfg);
+            cfg.modMenuOffsetX = PanelFit80.Offset(cfg.modMenuOffsetX);
+            cfg.modMenuOffsetY = PanelFit80.Offset(cfg.modMenuOffsetY);
             cfg.engineEffectProfile = EngineEffectPolicy.Normalize(cfg.engineEffectProfile);
             cfg.uiAspect = !TouchPointerMath.Finite(cfg.uiAspect) ? ApprovedUserDefaults.Aspect : cfg.uiAspect <= 0 ? 0 : HudPanelLayout.ClampAspect(cfg.uiAspect);
             cfg.uiOffsetX = TouchPointerMath.Finite(cfg.uiOffsetX) ? HudPanelLayout.ClampOffset(cfg.uiOffsetX) : ApprovedUserDefaults.OffsetX;
@@ -723,6 +735,10 @@ namespace RTMaquetaXR
             s += "drawDistanceCustom=" + cfg.drawDistanceCustom.ToString("R", CultureInfo.InvariantCulture) + "\n";
             s += "touchDrawDistanceShortcut=" + cfg.touchDrawDistanceShortcut + "\n";
             s += "touchThirdPersonFollow=" + cfg.touchThirdPersonFollow + "\n";
+            s += "touchFollowRecenter=" + cfg.touchFollowRecenter + "\n";
+            s += "openXrRuntimeManifest80=" + (cfg.openXrRuntimeManifest80 ?? "").Replace("\r", "").Replace("\n", "") + "\n";
+            s += "modMenuOffsetX=" + cfg.modMenuOffsetX.ToString("R", CultureInfo.InvariantCulture) + "\n";
+            s += "modMenuOffsetY=" + cfg.modMenuOffsetY.ToString("R", CultureInfo.InvariantCulture) + "\n";
             s += "adaptiveDistance=" + cfg.adaptiveDistance + "\n";
             s += "uiAspect=" + cfg.uiAspect.ToString("R", CultureInfo.InvariantCulture) + "\n";
             s += "uiElementScale=" + cfg.uiElementScale.ToString("R", CultureInfo.InvariantCulture) + "\n";
@@ -796,10 +812,12 @@ namespace RTMaquetaXR
             {
                 if (!File.Exists(_presetPaths[i])) { _log.Log(PresetNames[i] + " is empty - save it first."); return; }
                 int chosenRuntime = _cfg.openXrRuntime;
+                string chosenManifest80 = _cfg.openXrRuntimeManifest80;
                 bool chosenDiagnostics = AllDiagnosticsEnabled;
                 bool chosenOfxr77 = _cfg.ofxrEnabled77;
                 ParseInto(_cfg, File.ReadAllLines(_presetPaths[i]));
                 _cfg.openXrRuntime = chosenRuntime; // View presets do not change the next launch's connection.
+                _cfg.openXrRuntimeManifest80 = chosenManifest80;
                 _cfg.allDiagnosticsEnabled = _cfg.detailedProfiling = chosenDiagnostics;
                 _cfg.ofxrEnabled77 = chosenOfxr77;
                 _cfg.diagnosticsRevision77 = 77;
@@ -823,7 +841,8 @@ namespace RTMaquetaXR
         static float _startupStableSince = -1;
         static int _startupWidth, _startupHeight;
         static FullScreenMode _startupDisplayMode;
-        static void ArmOpenXR() { _autoStartArmed = _cfg.autoStartVr; }
+        static readonly bool _launcherVrRequested = Array.IndexOf(Environment.GetCommandLineArgs(), "--rtmaquetaxr-vr") >= 0;
+        static void ArmOpenXR() { _autoStartArmed = _launcherVrRequested; }
 
         static void OnUpdate(UnityModManager.ModEntry modEntry, float dt)
         {
@@ -918,6 +937,7 @@ namespace RTMaquetaXR
 
         static void StartVr()
         {
+            if (!_launcherVrRequested) return;
             if (_active) return;
             try
             {
@@ -1630,7 +1650,7 @@ namespace RTMaquetaXR
 
         static bool OnToggle(UnityModManager.ModEntry modEntry, bool value)
         {
-            _autoStartArmed = value && _cfg.autoStartVr;
+            _autoStartArmed = value && _launcherVrRequested;
             if (!value) StopVr();
             return true;
         }

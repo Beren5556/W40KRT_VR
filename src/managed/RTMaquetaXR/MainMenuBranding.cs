@@ -62,7 +62,7 @@ namespace RTMaquetaXR
                     var text = obj.AddComponent(tmpType) as Graphic;
                     if (text == null) throw new InvalidOperationException("Native menu typography is not a Graphic");
                     CopyMainMenuTextProperty(original,text,"font"); CopyMainMenuTextProperty(original,text,"fontSharedMaterial");
-                    SetMainMenuTextProperty(text,"text",ModLocalization.Text(MainMenuCredit)); SetMainMenuTextProperty(text,"fontSize",26f);
+                    SetMainMenuTextProperty(text,"text",(ModLocalization.Text(MainMenuCredit) + " | " + BuildTag)); SetMainMenuTextProperty(text,"fontSize",26f);
                     SetMainMenuTextProperty(text,"enableAutoSizing",false); SetMainMenuTextProperty(text,"enableWordWrapping",false);
                     SetMainMenuTextProperty(text,"richText",false);
                     var alignment = AccessTools.Property(tmpType,"alignment");
@@ -73,7 +73,7 @@ namespace RTMaquetaXR
                 else
                 {
                     var text = obj.AddComponent<Text>(); text.font = _liveFont != null ? _liveFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                    text.text = ModLocalization.Text(MainMenuCredit); text.fontSize = 26; text.alignment = TextAnchor.MiddleCenter;
+                    text.text = (ModLocalization.Text(MainMenuCredit) + " | " + BuildTag); text.fontSize = 26; text.alignment = TextAnchor.MiddleCenter;
                     text.color = new Color(.85f,.83f,.70f,1); text.raycastTarget = false;
                     text.horizontalOverflow = HorizontalWrapMode.Overflow; text.supportRichText = false;
                     _mainMenuBrandingText = text;
@@ -92,8 +92,8 @@ namespace RTMaquetaXR
         internal static void RefreshMainMenuBrandingLanguage()
         {
             if (_mainMenuBrandingText == null || _mainMenuBrandingLanguage == ModLocalization.Revision) return;
-            if (_mainMenuBrandingText is Text text) text.text = ModLocalization.Text(MainMenuCredit);
-            else SetMainMenuTextProperty(_mainMenuBrandingText,"text",ModLocalization.Text(MainMenuCredit));
+            if (_mainMenuBrandingText is Text text) text.text = (ModLocalization.Text(MainMenuCredit) + " | " + BuildTag);
+            else SetMainMenuTextProperty(_mainMenuBrandingText,"text",(ModLocalization.Text(MainMenuCredit) + " | " + BuildTag));
             _mainMenuBrandingLanguage = ModLocalization.Revision;
         }
         static void ReleaseMainMenuBranding()

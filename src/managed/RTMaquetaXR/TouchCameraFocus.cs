@@ -168,7 +168,7 @@ namespace RTMaquetaXR
         {
             if (InSpaceCombat || InNavigationMap || _touchFirstPerson || !TouchInputOwned || !_attached || _modeFlat || CinematicCameraOwnsInput) return;
             // Committing a native selection (including group/box selection) never frames it.
-            _touchFollowWasMoving=false;_touchThirdPersonFollower.Reset(); _touchFollowPlacementSettling=false;
+            _touchFollowReady=_touchFollowWasMoving=false;_touchThirdPersonFollower.Reset(); _touchFollowPlacementSettling=false;
             // SelectAll can be raised inside each character click, before our
             // OnClick postfix. Do not erase the first click of a double-click.
             ClearTouchCameraPendingFocus(_touchBox.Complete);

@@ -2,7 +2,7 @@
 
 **W40KRT_VR — The depth of Rogue Trader, on your tabletop.**
 
-> **First PC beta · OpenXR · English and Spanish**
+> **Public PC beta · OpenXR · English and Spanish**
 
 W40KRT_VR turns *Warhammer 40,000: Rogue Trader* into a virtual-reality experience built around a three-dimensional tabletop. Move around the scene, bring it closer, and manipulate it with Touch controllers as if the adventure were laid out in front of you.
 
@@ -18,65 +18,80 @@ The approach is reminiscent of **Demeo**, while preserving the original game's c
 - **Game-context coverage:** On-foot exploration, Ground combat, Space combat, Star map, Galactic map, Management screens, and Dialogues and cinematics.
 - **Configurable image quality:** saved profiles, adjustable resolution, TAA, and per-eye DLSS/DLAA for compatible NVIDIA GPUs.
 - **Experimental OFXR:** optional frame generation for the VR output.
+- **Dedicated VR launcher:** select the headset, connection, runtime, render mode, DLSS quality, and optional OFXR before starting the game.
 - **Comfort options:** panel size and distance, camera movement, tabletop controls, and independent layouts for different screens.
+- **Direct interface layout controls:** adjust the HUD, management screens, maps, control hints, and F1 menu from the main VR settings.
 - **English and Spanish help:** contextual reminders and control guidance adapt to the current game context.
 - **VR-oriented exploration interactions** and optional combat visibility settings intended to reduce rendering load.
 
 The **Star map** is the warp-route and travel interface. The **Galactic map** shows planets within a system. Orders, abilities, movement rules, and game data remain part of the original game.
 
+## What's new in 0.9.80
+
+- A single shared English installer, `INSTALL.cmd`, for all supported headsets. There are no separate installers for individual headset or runtime choices.
+- Launcher selection for headset, connection, OpenXR runtime, rendering mode, DLSS quality, and experimental OFXR.
+- Meta Quest through VDXR or Meta Link/Air Link, PICO 4/4 Ultra through VDXR, and Pimax Dream Air/SE SLAM through Pimax Play native OpenXR.
+- Automatic follow recentering now starts off. Right-stick party movement follows horizontally while retaining the current tabletop height, angle, and scale; the previous framing remains available as an option.
+- Direct **Interface position and size** controls for the HUD, management screens, maps, control hints, and F1 menu.
+- Independent F1 positioning and improved fitting within the visible area of both eyes.
+- Native tutorial hints use their complete bounds for improved placement and legibility.
+- The warp-route Star map uses its native right options bar; the system/planet map retains its right wheel.
+- Improved startup diagnostics distinguish a runtime/GPU mismatch from insufficient D3D11 capability and allow copying details with **Ctrl+C**.
+- Safer Steam startup: the launcher checks that the Steam edition can connect to Steam before saving changes or opening the game.
+
 ## Compatibility
 
-| Component | First-beta support |
+| Component | Beta support |
 | --- | --- |
 | Game | Steam edition of *Warhammer 40,000: Rogue Trader*, using the build stated in the release |
 | System | 64-bit Windows 10 or 11 |
 | Graphics API | DirectX 11 |
 | VR standard | OpenXR |
-| Tested headset and controllers | Meta Quest 3 with Touch controllers |
-| Virtual Desktop | VDXR |
+| Physically validated headsets | Meta Quest 3, PICO 4/4 Ultra, and Pimax Dream Air/Dream Air SE SLAM |
+| Virtual Desktop | Meta Quest and PICO 4/4 Ultra through VDXR |
 | Meta connection | Meta Quest Link or Air Link |
+| Pimax | Dream Air and Dream Air SE SLAM through Pimax Play native OpenXR |
 | Mod languages | English and Spanish |
 
-W40KRT_VR uses OpenXR directly and does not require SteamVR. Other headsets, storefronts, and mod combinations are not considered supported until they have been tested.
+W40KRT_VR uses OpenXR directly and does not require SteamVR. PICO Connect, the legacy PimaxXR runtime, eye tracking, Quad Views, Lighthouse controllers, other storefronts, and unlisted headset combinations are outside this beta.
 
 The mod's own interface is available in English and Spanish. Native game text and data retain the language selected in *Rogue Trader*.
 
 ## Install
 
-> **Why are there two installers?** Both install exactly the same mod. Use **INSTALL-VDXR.cmd** when you play through Virtual Desktop/VDXR, or **INSTALL-META.cmd** when you use Meta Quest Link/Air Link. The only difference is the initial OpenXR runtime selected in the mod settings. You can change it later from the mod menu and restart the game.
-
 1. Download the beta ZIP from [Releases](../../releases).
 2. Extract the entire archive into a new folder outside the game directory.
 3. Close *Rogue Trader* completely.
-4. Run **INSTALL-VDXR.cmd** for Virtual Desktop/VDXR or **INSTALL-META.cmd** for Meta Quest Link/Air Link.
+4. Run the single shared **INSTALL.cmd**. Do not look for a headset-specific installer: headset, connection, and runtime selection happens later in the launcher. The game uses its built-in mod loader; another mod manager is not required.
 5. If the installer cannot find the game, select the folder containing `WH40KRT.exe`.
-6. Connect the headset through the selected provider.
-7. Launch *Rogue Trader* from Steam using **DirectX 11** and load a save.
+6. Connect the headset and controllers through Virtual Desktop, Meta Quest Link/Air Link, or Pimax Play as appropriate.
+7. Run **LAUNCH-VR.cmd**, select the headset and connection, and press **Launch game**.
 
 The package includes installation and removal tools. You do not need to compile the source, install RTVR separately, or add an external mod manager.
 
 To update, run the installer from the new package while the game is closed. Existing settings and a user-selected DLSS DLL are preserved. To remove this beta, use **UNINSTALL.cmd** from the matching package.
 
-## Selecting the OpenXR runtime
+The installer also creates a **Rogue Trader VR** shortcut using the icon from the locally installed game. Starting the game normally through Steam or `WH40KRT.exe` remains flat; use the launcher or its shortcut for VR.
 
-The two installers select the initial runtime:
+## VR launcher and OpenXR runtime
 
-- **INSTALL-VDXR.cmd** for Virtual Desktop/VDXR.
-- **INSTALL-META.cmd** for Meta Quest Link/Air Link.
+The English launcher supports these paths:
 
-You can later change **OpenXR runtime** in the mod settings. The new choice is applied after fully restarting the game. It affects only the game process and does not change the default OpenXR runtime in Windows or modify NVIDIA profiles.
+- **Meta Quest:** Virtual Desktop/VDXR or Meta Quest Link/Air Link.
+- **PICO 4 and PICO 4 Ultra:** Virtual Desktop/VDXR only.
+- **Pimax Dream Air and Dream Air SE SLAM:** Pimax Play native OpenXR.
+
+The launcher detects or accepts the runtime file, starts DirectX 11, and applies the selected runtime only to the game process. It does not change the default OpenXR runtime in Windows or modify NVIDIA profiles. It reads the saved rendering mode, DLSS scale, and OFXR preference; changes are committed when the launch is requested and rolled back if the process cannot be started.
+
+For the Steam edition, open Steam normally and sign in before launching VR. W40KRT_VR checks the Steam connection before saving preferences or starting the game, then opens `WH40KRT.exe` directly with the VR and DirectX 11 arguments and closes the launcher. It does not start the Steam client. If Steam is closed or unavailable, the launcher asks you to open it instead of allowing the game to start without its mods. Do not run the launcher as administrator.
 
 ## Experimental OFXR
 
 OFXR is an optional frame-generation mode for the VR output. It can improve perceived smoothness, but results depend on the PC, scene, and configuration, and it may introduce visual artifacts or latency.
 
-To try it:
+To try it, select **Experimental OFXR** in the launcher before starting VR, or enable it from the main VR settings and restart the game. If **Selective engine cadence** is active, the launcher offers an explicit choice because the two modes are incompatible.
 
-1. Disable **Selective engine cadence**, because the two modes are incompatible.
-2. Enable **Experimental OFXR** on the main settings page or under **Advanced settings > Performance**.
-3. Fully restart the game.
-
-Disable the option and restart again to return to normal rendering. OFXR works over either VDXR or Meta Quest Link. It is off by default and does not replace DLSS/DLAA.
+Disable the option and restart again to return to normal rendering. OFXR works over the supported runtime paths, is off by default, and does not replace DLSS/DLAA. The in-game OFXR status reports whether synthesis is actually active; selecting the launcher option is only a request.
 
 ## Performance guidance
 
@@ -119,13 +134,13 @@ Controls adapt to the current game context.
 | Toggle contextual reminders | Short right-stick click |
 | Open or close VR settings | Hold both triggers and both grips for 1 second, or press **F1** |
 
-On the Star and Galactic maps, use the right stick to pan and the left stick up/down to zoom. Native windows and dialogue use the right-hand pointer with the right trigger or **A**; the right stick scrolls and **B** goes back when allowed by the game.
+On the Star and Galactic maps, use the right stick to pan and the left stick up/down to zoom. The warp-route Star map uses the native right options bar; the system/planet map retains its right wheel. Native windows and dialogue use the right-hand pointer with the right trigger or **A**; the right stick scrolls and **B** goes back when allowed by the game.
 
 The mod includes contextual help and an illustrated in-game control guide. A separate English/Spanish quick-reference image will be added to this page.
 
 ## Beta status
 
-This is the first public beta of W40KRT_VR. Performance can vary during combat and complex scenes, and untested hardware or game situations may expose additional issues.
+W40KRT_VR remains in public beta. Version 0.9.80 expands headset setup and interface controls, and the listed Meta, PICO, and Pimax paths have been physically validated. Performance can still vary between PCs and during combat or complex scenes.
 
 This is a personal project without formal technical support. Experiences and questions may be discussed in community forums, without a commitment by the author to respond, investigate, or provide fixes.
 
@@ -138,8 +153,7 @@ These items are being considered and are not promised for a particular release:
 - Hand Tracking as an alternative or complement to Touch controllers.
 - Interaction with hyperlinks that open additional information in game windows.
 - Further OFXR development and tuning.
-- Support for Pimax, Quest 2, and Pico 4 headsets.
-- A game launcher that selects VDXR or Meta Quest Link and enables or disables OFXR before launch.
+- Broader compatibility with additional headsets and connection methods.
 - Additional combat performance and stability work.
 - Additional camera, interface, and control options.
 

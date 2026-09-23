@@ -9,7 +9,7 @@ namespace RTMaquetaXR
     public sealed class HudPreset
     {
         public int Format = 4;
-        public float MapGlobalZoom=.5f,MapSystemZoom=.5f;
+        public float MapGlobalZoom=ApprovedUserDefaults.MapZoom,MapSystemZoom=ApprovedUserDefaults.MapZoom;
         public float MenuDistance = ApprovedUserDefaults.MenuDistance, MenuWidth = ApprovedUserDefaults.MenuWidth, MenuAspect = ApprovedUserDefaults.MenuAspect, MenuOffsetX = ApprovedUserDefaults.MenuX, MenuOffsetY = ApprovedUserDefaults.MenuY, MenuTextScale = ApprovedUserDefaults.MenuText;
         public float MapGlobalWidth=.82f,MapGlobalDistance=.5f,MapGlobalAspect=0,MapGlobalOffsetX=0,MapGlobalOffsetY=0;
         public float MapSystemWidth=.82f,MapSystemDistance=.5f,MapSystemAspect=0,MapSystemOffsetX=0,MapSystemOffsetY=0;
@@ -41,7 +41,7 @@ namespace RTMaquetaXR
         internal void Apply(Main.Settings settings)
         {
             if(Format<1 || Format>4) throw new InvalidDataException("Unsupported HUD preset version");
-            if(Format>=4){settings.mapGlobalZoom=Safe(MapGlobalZoom,.5f,0,1);settings.mapSystemZoom=Safe(MapSystemZoom,.5f,0,1);}
+            if(Format>=4){settings.mapGlobalZoom=Safe(MapGlobalZoom,ApprovedUserDefaults.MapZoom,0,1);settings.mapSystemZoom=Safe(MapSystemZoom,ApprovedUserDefaults.MapZoom,0,1);}
             if(Format>=3)
             {
                 settings.mapGlobalWidth=MapGlobalWidth;settings.mapGlobalDistance=MapGlobalDistance;settings.mapGlobalAspect=MapGlobalAspect;

@@ -72,6 +72,7 @@ namespace RTMaquetaXR
             // Never publish new dimensions while the old GPU pair is in flight.
             float output=next.renderScale, oldOutput=_cfg.renderScale;
             next.openXrRuntime = _cfg.openXrRuntime; // Quality/personal presets never switch the connection.
+            next.openXrRuntimeManifest80 = _cfg.openXrRuntimeManifest80;
             next.allDiagnosticsEnabled = !resetDiagnostics && _cfg.allDiagnosticsEnabled;
             next.detailedProfiling = next.allDiagnosticsEnabled;
             next.diagnosticsRevision77 = 77;

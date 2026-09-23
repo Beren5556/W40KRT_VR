@@ -18,7 +18,7 @@ namespace RTMaquetaXR
             new[] { "select", "head-view", "combat-ground-head", "drag-select", "table-move", "rotate-zoom", "tilt", "radial-left", "radial-weapons", "radial-left-modes", "combat-inspect", "combat-status", "tactical-info", "wheel-cards", "end-turn", "radial-right", "pause", "secondary", "overlay", "overlay-navigation", "context-reminder", "diagnostics-effects", "keyboard-settings" },
             new[] { "native-panels", "dialogue-camera", "table-move", "rotate-zoom", "tilt", "hud-layout", "secondary", "overlay", "overlay-navigation", "keyboard-settings" },
             new[] { "native-panels", "weapon-comparison", "wheel-cards", "radial-right", "hud-layout", "secondary", "overlay", "overlay-navigation", "quality-settings", "keyboard-settings" },
-            new[] { "navigation-space", "map-layout", "native-panels", "radial-right", "secondary", "overlay", "overlay-navigation", "keyboard-settings" },
+            new[] { "navigation-space", "map-layout", "native-panels", "secondary", "overlay", "overlay-navigation", "keyboard-settings" },
             new[] { "navigation-space", "map-layout", "native-panels", "radial-right", "secondary", "overlay", "overlay-navigation", "keyboard-settings" },
             new[] { "space-battle", "select", "head-view", "table-move", "rotate-zoom", "tilt", "radial-left", "radial-weapons", "radial-left-modes", "combat-inspect", "combat-status", "wheel-cards", "end-turn", "radial-right", "pause", "secondary", "overlay", "overlay-navigation", "context-reminder", "keyboard-settings" }
         };
@@ -42,6 +42,7 @@ namespace RTMaquetaXR
             new TouchContextBinding("back", "secondary", "B · back / cancel", "B", "Cancel / back"),
             new TouchContextBinding("scroll", "native-panels", "Right stick · scroll native panel", "R:Y", "Scroll"),
             new TouchContextBinding("map", "navigation-space", "Right trigger · native selection / travel", "RT", "Select / travel"),
+            new TouchContextBinding("map-options", "native-panels", "Right pointer + trigger · right options bar", "RT", "Right bar · options"),
             new TouchContextBinding("map-zoom", "navigation-space", "Right stick · pan / left stick · zoom", "R/L", "Pan / zoom"),
             new TouchContextBinding("local", "exploration-shortcuts", "Right stick · pan map", "R", "Pan map"),
             new TouchContextBinding("local-zoom", "exploration-shortcuts", "Left stick · map zoom / rotation", "L", "Zoom / rotate map"),
@@ -117,7 +118,7 @@ namespace RTMaquetaXR
                 case TouchHintContext.Management: return Lines("click", "scroll", "back", "compare", "settings");
                 case TouchHintContext.Tutorial: case TouchHintContext.DialoguePanel: return Lines("click", "scroll", "back", "settings");
                 case TouchHintContext.Paused: return Lines("click", "pause", "settings", "table", "orbit", "wheels");
-                case TouchHintContext.GalacticMap: return Lines("map", "map-pan", "map-scale", "wheels", "back", "settings");
+                case TouchHintContext.GalacticMap: return Lines("map", "map-pan", "map-scale", "map-options", "back", "settings");
                 case TouchHintContext.StarSystemMap: return Lines("map", "map-pan", "map-scale", "wheels", "back", "settings");
                 case TouchHintContext.SpaceCombat: return Lines("order", "frame", "deep", "table", "scale", "ships", "orbit", "wheels", "back", "pause", "settings");
                 case TouchHintContext.LocalMap: return Lines("local", "local-zoom", "local-back", "settings");

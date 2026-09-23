@@ -173,7 +173,7 @@ namespace RTMaquetaXR
                 // objectives and native end-turn with no equivalent in our wheels.
                 // Only replace the native right-menu chrome in navigation.
                 // Map routes, labels, objectives and travel controls stay live.
-                bool wheelsAvailable = (InNavigationMap ? TouchRadialMenusAvailable : InSpaceCombat ? !_cfg.spaceHudVisible : PcHudMinimal) && _presentation != null && _pcHudAlphaHookReady;
+                bool wheelsAvailable = !InGalacticMap && (InNavigationMap ? TouchRadialMenusAvailable : InSpaceCombat ? !_cfg.spaceHudVisible : PcHudMinimal) && _presentation != null && _pcHudAlphaHookReady;
                 if (paths != null) foreach (var path in paths)
                 {
                     bool hide = wheelsAvailable && (InSpaceCombat || CanReplacePcHudPanel(path));

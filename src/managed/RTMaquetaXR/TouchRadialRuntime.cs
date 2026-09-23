@@ -123,6 +123,10 @@ namespace RTMaquetaXR
                 const uint controls = (uint)(XrTouchControl.Trigger | XrTouchControl.Squeeze);
                 bool controlsValid = !requested || ((left.activeControls & controls) == controls && (right.activeControls & controls) == controls);
                 int owner = _touchRadial.Side >= 0 ? _touchRadial.Side : _touchRawLeftTrigger && _overlayLeftGripPressed ? 0 : 1;
+                // GlobalMap keeps its native right bar. The four-button settings
+                // chord is processed separately and remains available.
+                bool rightWheelAllowed80 = !InGalacticMap;
+                blocked |= owner == 1 && !rightWheelAllowed80;
                 if (requested) controlsValid &= owner == 0 ? left.AimValid : right.AimValid;
                 int stick = _touchRadial.Visible ? TouchRadialPolicy.PickStable(owner == 0 ? left.stickX : right.stickX,
                     owner == 0 ? left.stickY : right.stickY, _touchRadialEntries.Count, _touchRadial.Selected, _touchRadialInnerCount) : -1;
@@ -137,8 +141,8 @@ namespace RTMaquetaXR
                 int holdAction = -1;
                 for (int i=0;i<_touchRadialEntries.Count;i++) if (_touchRadialEntries[i].EndTurn) { holdAction=i; break; }
                 var result = _touchRadial.Step(_touchRawLeftTrigger, _overlayLeftGripPressed,
-                    _touchRadialSettingsChord.Deferring ? _touchRadialSettingsChord.Pulse : _touchRawRightTrigger,
-                    !_touchRadialSettingsChord.Deferring && _overlayRightGripPressed, _touchSampleValid && controlsValid, blocked, Time.unscaledTime,
+                    rightWheelAllowed80 && (_touchRadialSettingsChord.Deferring ? _touchRadialSettingsChord.Pulse : _touchRawRightTrigger),
+                    rightWheelAllowed80 && !_touchRadialSettingsChord.Deferring && _overlayRightGripPressed, _touchSampleValid && controlsValid, blocked, Time.unscaledTime,
                     left.stickX, left.stickY, right.stickX, right.stickY, _touchRadialEntries.Count, hit,
                     (left.activeControls & (uint)XrTouchControl.StickClick) != 0 && (left.buttons & (uint)XrTouchButton.StickClick) != 0,
                     stickAvailable, pointerAvailable, TouchRadialInformationOnly, TouchRadialAbilityMode,

@@ -58,9 +58,12 @@ namespace RTMaquetaXR
             // shares the availability gate: DLSS scale is read-only in every
             // menu when a different render mode is selected.
             advanced.Options[advanced.Options.Count - 3].Menu.Options.Insert(0, language);
+            var placement = InterfacePlacementOptions80(advanced);
+            var recenter = FollowRecenterOption80();
+            FindLayoutOption80(advanced,"Tabletop").Menu.Options.Insert(0,recenter);
             return _qualityRoot = new OverlayMenu("Main menu", new[] {
-                QualityPresetOption(), image.Options[0], image.Options[1], image.Options[2], image.Options[6], ofxr, combatEffects, runtime, language,
-                ExplorationZoomLimitOption(), allDiagnostics, SaveCustomOption(), ResetSettingsOption(),
+                QualityPresetOption(), image.Options[0], image.Options[1], image.Options[2], image.Options[6], placement, ofxr, combatEffects, runtime, language,
+                ExplorationZoomLimitOption(), recenter, allDiagnostics, SaveCustomOption(), ResetSettingsOption(),
                 advanced.Options.Find(option => option.LabelKey == "Help · Touch controls"), AdvancedWarningOption(advanced)
             }, root: true);
         }

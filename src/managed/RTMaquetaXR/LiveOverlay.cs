@@ -127,16 +127,7 @@ namespace RTMaquetaXR
             var panelRect = (RectTransform)_liveRoot.transform;
             var panelSize = new Vector2(CurrentLivePanelWidth, CurrentLivePanelHeight);
             if (panelRect.sizeDelta != panelSize) panelRect.sizeDelta = panelSize;
-            Vector3 menuOffset=Vector3.zero;
-            if(!TurnConfirmationVisible&&!TouchQuickGuideVisible)
-            {
-                float visibleHeight=2f*distance*Mathf.Tan(Mathf.Deg2Rad*((left.fieldOfView+right.fieldOfView)*.25f));
-                float aspect=(left.aspect+right.aspect)*.5f;
-                float visibleWidth=visibleHeight*Mathf.Max(.1f,aspect);
-                menuOffset=new Vector3(0,-visibleHeight*.20f,0);
-            }
-            PositionHudHelper(_liveRoot.transform, center + rotation * (new Vector3(0, 0, distance)+menuOffset), rotation,
-                distance * (TurnConfirmationVisible ? .52f : TouchQuickGuideVisible ? TouchQuickGuideLayout.WidthAtDistance : 0.9f) / CurrentLivePanelWidth);
+            PlaceModMenu80(left,right,center,rotation,distance);
             if (_liveCanvas.worldCamera != left) _liveCanvas.worldCamera = left;
             // Present the canvas to Unity's normal UI rebuild before camera culling.
             // Camera callbacks then limit its rendering to the two VR eyes.

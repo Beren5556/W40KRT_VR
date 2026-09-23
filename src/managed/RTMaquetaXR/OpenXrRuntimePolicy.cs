@@ -9,7 +9,7 @@ namespace RTMaquetaXR
     {
         internal int Applied { get; private set; }
         internal bool Captured { get; private set; }
-        internal static int Normalize(int value) => value == 1 ? 1 : 0;
+        internal static int Normalize(int value) => value == 1 || value == 2 ? value : 0;
         internal void Capture(int value)
         {
             if (Captured) return;
@@ -20,12 +20,16 @@ namespace RTMaquetaXR
 
     internal static class OpenXrRuntimePolicy
     {
-        internal static string Name(int value) => OpenXrRuntimeSelection.Normalize(value) == 1 ? "Meta Quest Link" : "VDXR";
-        internal static string ManifestName(int value) => OpenXrRuntimeSelection.Normalize(value) == 1 ? "oculus_openxr_64.json" : "virtualdesktop-openxr.json";
+        internal static string Name(int value) => OpenXrRuntimeSelection.Normalize(value) == 2 ? "Pimax OpenXR" : OpenXrRuntimeSelection.Normalize(value) == 1 ? "Meta Quest Link" : "VDXR";
+        internal static string ManifestName(int value) => OpenXrRuntimeSelection.Normalize(value) == 2 ? "PiOpenXR.json" : OpenXrRuntimeSelection.Normalize(value) == 1 ? "oculus_openxr_64.json" : "virtualdesktop-openxr.json";
         internal static bool MatchesManifest(int value, string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return false;
-            try { return string.Equals(Path.GetFileName(path.Trim().Trim('"')), ManifestName(value), StringComparison.OrdinalIgnoreCase); }
+            try {
+                string name=Path.GetFileName(path.Trim().Trim('"'));
+                if(value==2)return string.Equals(name,"PiOpenXR.json",StringComparison.OrdinalIgnoreCase)||string.Equals(name,"PiOpenXR_64.json",StringComparison.OrdinalIgnoreCase)||string.Equals(name,"PimaxOpenXR.json",StringComparison.OrdinalIgnoreCase);
+                return string.Equals(name, ManifestName(value), StringComparison.OrdinalIgnoreCase);
+            }
             catch (ArgumentException) { return false; }
         }
         internal static string FindManifest(int value, IEnumerable<string> candidates, Func<string, bool> exists)

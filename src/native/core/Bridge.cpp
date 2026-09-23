@@ -1,6 +1,7 @@
 ﻿// Copyright (c) 2026 Proyecto personal Rogue Trader VR. MIT.
 #include "Bridge.h"
 #include "RuntimePolicy.h"
+#include "ResolutionPolicy80.h"
 #include <windows.h>
 #include <d3d11_4.h>
 #include <d3dcompiler.h>
@@ -530,8 +531,7 @@ void CreateChain(Chain& chain, uint32_t width, uint32_t height, bool spatialFilt
     }
 }
 uint32_t ScaledSize(uint32_t recommended, uint32_t maximum, float scale) {
-    if (scale == 1.f) return std::min(maximum, recommended);
-    return std::min(maximum, std::max(64u, static_cast<uint32_t>(std::ceil(recommended * scale / 2.f)) * 2u));
+    return ResolutionPolicy80::Scaled(recommended, maximum, scale);
 }
 DXGI_FORMAT SourceFormat(DXGI_FORMAT format) {
     switch (format) {
@@ -817,6 +817,15 @@ void Poll() {
             } else if (state == XR_SESSION_STATE_STOPPING && running) {
                 EndEmpty(); Check(xrEndSession(session), "xrEndSession"); running = false;
             } else if (state == XR_SESSION_STATE_EXITING || state == XR_SESSION_STATE_LOSS_PENDING) running = false;
+        } else if (event.type == XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED && touchActions.set) {
+            for (int hand80=0; hand80<2; ++hand80) {
+                XrInteractionProfileState profile80{XR_TYPE_INTERACTION_PROFILE_STATE};
+                if (XR_SUCCEEDED(xrGetCurrentInteractionProfile(session,touchActions.hands[hand80],&profile80))) {
+                    char path80[XR_MAX_PATH_LENGTH]{}; uint32_t length80=0;
+                    if (profile80.interactionProfile && XR_SUCCEEDED(xrPathToString(instance,profile80.interactionProfile,sizeof(path80),&length80,path80)))
+                        Log(std::string("Controller profile ")+(hand80?"right: ":"left: ")+path80);
+                }
+            }
         } else if (event.type == XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING) {
             state = XR_SESSION_STATE_LOSS_PENDING; running = false;
         } else if (event.type == XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING) {
@@ -862,7 +871,7 @@ void CreateTouchActions() {
         CreateTouchAction(touchActions.menu, "menu", "Left menu", XR_ACTION_TYPE_BOOLEAN_INPUT, true);
         CreateTouchAction(touchActions.stickClick, "stick_click", "Thumbstick click", XR_ACTION_TYPE_BOOLEAN_INPUT);
         CreateTouchAction(touchActions.thumbrest, "thumbrest_touch", "Left thumbrest touch", XR_ACTION_TYPE_BOOLEAN_INPUT, true);
-        const XrActionSuggestedBinding bindings[] = {
+        std::vector<XrActionSuggestedBinding> bindings = {
             {touchActions.aim, TouchPath("/user/hand/left/input/aim/pose")},
             {touchActions.aim, TouchPath("/user/hand/right/input/aim/pose")},
             {touchActions.grip, TouchPath("/user/hand/left/input/grip/pose")},
@@ -884,8 +893,29 @@ void CreateTouchActions() {
         };
         XrInteractionProfileSuggestedBinding suggest{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
         suggest.interactionProfile = TouchPath("/interaction_profiles/oculus/touch_controller");
-        suggest.countSuggestedBindings = static_cast<uint32_t>(std::size(bindings)); suggest.suggestedBindings = bindings;
-        Check(xrSuggestInteractionProfileBindings(instance, &suggest), "Touch xrSuggestInteractionProfileBindings");
+        suggest.countSuggestedBindings = static_cast<uint32_t>(bindings.size()); suggest.suggestedBindings = bindings.data();
+        XrResult touchResult80 = xrSuggestInteractionProfileBindings(instance, &suggest);
+        if (XR_FAILED(touchResult80)) {
+            // Thumbrest capacitive input is optional, never a prerequisite for
+            // movement/selection on controllers that emulate Touch.
+            bindings.pop_back(); suggest.countSuggestedBindings = static_cast<uint32_t>(bindings.size());
+            touchResult80 = xrSuggestInteractionProfileBindings(instance, &suggest);
+        }
+        std::vector<XrActionSuggestedBinding> indexBindings80;
+        for (const char* hand : {"/user/hand/left", "/user/hand/right"}) {
+            const std::string base(hand);
+            for (const auto& item : std::vector<std::pair<XrAction, const char*>>{
+                {touchActions.aim,"/input/aim/pose"},{touchActions.grip,"/input/grip/pose"},
+                {touchActions.trigger,"/input/trigger/value"},{touchActions.squeeze,"/input/squeeze/value"},
+                {touchActions.stick,"/input/thumbstick"},{touchActions.stickClick,"/input/thumbstick/click"},
+                {touchActions.primary,"/input/a/click"},{touchActions.secondary,"/input/b/click"}})
+                indexBindings80.push_back({item.first,TouchPath((base+item.second).c_str())});
+        }
+        XrInteractionProfileSuggestedBinding indexSuggest80{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
+        indexSuggest80.interactionProfile=TouchPath("/interaction_profiles/valve/index_controller");
+        indexSuggest80.countSuggestedBindings=static_cast<uint32_t>(indexBindings80.size());indexSuggest80.suggestedBindings=indexBindings80.data();
+        const XrResult indexResult80=xrSuggestInteractionProfileBindings(instance,&indexSuggest80);
+        if(XR_FAILED(touchResult80)&&XR_FAILED(indexResult80))Check(touchResult80,"No supported Touch/Index action bindings");
         for (int i = 0; i < 2; ++i) {
             XrActionSpaceCreateInfo space{XR_TYPE_ACTION_SPACE_CREATE_INFO};
             space.subactionPath = touchActions.hands[i]; space.poseInActionSpace.orientation.w = 1;
@@ -899,7 +929,7 @@ void CreateTouchActions() {
         Check(xrAttachSessionActionSets(session, &attach), "Touch xrAttachSessionActionSets");
         touchActions.ready = true; touchActions.result = XR_SUCCESS;
         ClearTouchSnapshot();
-        Log("[touch] Oculus Touch actions bound and attached before xrBeginSession; aim/grip, trigger/squeeze, sticks, X/Y/A/B and left menu; no right system-menu binding");
+        Log("[touch] Touch/Index suggestions attached before xrBeginSession; core pose, trigger/grip, sticks and face buttons; capacitive input optional; no system-menu binding for Index");
     } catch (const std::exception& error) {
         // A controller binding failure must not break already working stereo or
         // mouse/gamepad play. A later session recreates the complete action set.
@@ -1262,8 +1292,30 @@ int __cdecl RTX_Init(void* texture, float scale, const wchar_t* path) {
         Check(requirementsFunction(instance, systemId, &requirements), "xrGetD3D11GraphicsRequirementsKHR");
         ComPtr<IDXGIDevice> dxgi; ComPtr<IDXGIAdapter> adapter; DXGI_ADAPTER_DESC desc{};
         Hr(device.As(&dxgi), "IDXGIDevice"); Hr(dxgi->GetAdapter(&adapter), "GetAdapter"); Hr(adapter->GetDesc(&desc), "GetDesc");
-        if (memcmp(&desc.AdapterLuid, &requirements.adapterLuid, sizeof(LUID)) || device->GetFeatureLevel() < requirements.minFeatureLevel)
-            throw std::runtime_error("Unity D3D11 adapter/feature level does not match the selected OpenXR runtime");
+        char unityName80[512]{};
+        WideCharToMultiByte(CP_UTF8,0,desc.Description,-1,unityName80,sizeof(unityName80),nullptr,nullptr);
+        if (memcmp(&desc.AdapterLuid, &requirements.adapterLuid, sizeof(LUID))) {
+            char requiredName80[512]="Unknown adapter";
+            ComPtr<IDXGIFactory> factory80;
+            if(SUCCEEDED(adapter->GetParent(IID_PPV_ARGS(&factory80))))for(UINT i=0;;i++) {
+                ComPtr<IDXGIAdapter> candidate80;DXGI_ADAPTER_DESC candidateDesc80{};
+                if(factory80->EnumAdapters(i,&candidate80)!=S_OK)break;
+                if(SUCCEEDED(candidate80->GetDesc(&candidateDesc80))&&!memcmp(&candidateDesc80.AdapterLuid,&requirements.adapterLuid,sizeof(LUID))) {
+                    WideCharToMultiByte(CP_UTF8,0,candidateDesc80.Description,-1,requiredName80,sizeof(requiredName80),nullptr,nullptr);break;
+                }
+            }
+            char details80[1600]{};
+            snprintf(details80,sizeof(details80),"Graphics adapter mismatch: Unity=%s [%08X:%08X]; OpenXR=%s [%08X:%08X]; runtime=%s. Restart the game on the required GPU.",
+                unityName80,static_cast<unsigned>(desc.AdapterLuid.HighPart),desc.AdapterLuid.LowPart,
+                requiredName80,static_cast<unsigned>(requirements.adapterLuid.HighPart),requirements.adapterLuid.LowPart,runtime.runtimeName);
+            throw std::runtime_error(details80);
+        }
+        if(device->GetFeatureLevel()<requirements.minFeatureLevel) {
+            char details80[900]{};
+            snprintf(details80,sizeof(details80),"D3D11 feature level insufficient: GPU=%s; current=0x%X; required=0x%X; runtime=%s. This device cannot satisfy the runtime graphics requirement.",
+                unityName80,static_cast<unsigned>(device->GetFeatureLevel()),static_cast<unsigned>(requirements.minFeatureLevel),runtime.runtimeName);
+            throw std::runtime_error(details80);
+        }
         XrGraphicsBindingD3D11KHR binding{XR_TYPE_GRAPHICS_BINDING_D3D11_KHR}; binding.device = device.Get();
         XrSessionCreateInfo sessionInfo{XR_TYPE_SESSION_CREATE_INFO}; sessionInfo.next = &binding; sessionInfo.systemId = systemId;
         Trace("xrCreateSession begin");
@@ -1283,8 +1335,11 @@ int __cdecl RTX_Init(void* texture, float scale, const wchar_t* path) {
         scale = std::isfinite(scale) ? std::clamp(scale, 0.25f, 1.5f) : 1.f;
         recommendedWidth = std::max(config[0].recommendedImageRectWidth,config[1].recommendedImageRectWidth);
         recommendedHeight = std::max(config[0].recommendedImageRectHeight,config[1].recommendedImageRectHeight);
-        maximumWidth = std::min(config[0].maxImageRectWidth,config[1].maxImageRectWidth);
-        maximumHeight = std::min(config[0].maxImageRectHeight,config[1].maxImageRectHeight);
+        const uint32_t textureLimit80 = device->GetFeatureLevel() >= D3D_FEATURE_LEVEL_11_0 ? 16384u : 8192u;
+        maximumWidth = std::min({config[0].maxImageRectWidth,config[1].maxImageRectWidth,textureLimit80});
+        maximumHeight = std::min({config[0].maxImageRectHeight,config[1].maxImageRectHeight,textureLimit80});
+        if (!recommendedWidth || !recommendedHeight || !maximumWidth || !maximumHeight)
+            throw std::runtime_error("OpenXR reported an invalid eye resolution");
         appliedRenderScale = scale;
         eyeWidth = ScaledSize(recommendedWidth, maximumWidth, scale);
         eyeHeight = ScaledSize(recommendedHeight, maximumHeight, scale);

@@ -96,6 +96,7 @@ namespace RTMaquetaXR
         {
             AtomicWrite(path,Merge(File.Exists(path)?File.ReadAllText(path):"",current));
         }
+        public static void RestoreExact(string path,string previous) { AtomicWrite(path,previous); }
         static void Backup(string path,string suffix)
         {
             if(!File.Exists(path+suffix))File.Copy(path,path+suffix,false);
