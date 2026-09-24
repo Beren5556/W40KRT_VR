@@ -123,8 +123,8 @@ namespace RTMaquetaXR
             return (Func<object, T>)method.CreateDelegate(typeof(Func<object, T>));
         }
 
-        static bool ForcedVisibilityEnabled => _active && _attached && !_modeFlat && _cfg.syncForcedVisibility && _cfg.skipDesktopWorld &&
-            _desktopMirrorHook && !_desktopFallback && _forcedVisibilityHook && _forcedVisibilityDisposeHook && !_forcedVisibilityFailed;
+        static bool ForcedVisibilityEnabled => _active && _attached && !_modeFlat && _cfg.syncForcedVisibility && MonitorWorldSkip81 &&
+            _desktopMirrorHook && !MonitorRecoveryBlocks81 && _forcedVisibilityHook && _forcedVisibilityDisposeHook && !_forcedVisibilityFailed;
 
         static void ForcedVisibilityUpdatePostfix(object __instance)
         {

@@ -56,6 +56,7 @@ XrPosef head{};
 int eyeWidth = 0, eyeHeight = 0;
 int recommendedWidth = 0, recommendedHeight = 0;
 int maximumWidth = 0, maximumHeight = 0;
+int uiMaxLayers81=0,uiMaxWidth81=0,uiMaxHeight81=0;
 float appliedRenderScale = 0;
 int64_t colorFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 Stats stats{};
@@ -129,7 +130,9 @@ int gpuPassCursor = 0;
 bool gpuPassUnsupported = false;
 bool gpuPassWork = false;
 
+#include "MonitorTiming81.inc"
 void ResetGpuPassQueries() {
+    ResetMonitor81();
     for (auto& query : gpuPassQueries) query = {};
     gpuPassSubmissions = 0; gpuPassCursor = 0; gpuPassUnsupported = false;
     gpuPassWork = false;
@@ -256,6 +259,8 @@ struct Job {
     uint64_t hudSerial = 0;
     ComPtr<ID3D11Texture2D> hudBlack, hudWhite;
     float hudWidth = 0, hudHeight = 0, hudDistance = 0, hudX = 0, hudY = 0;
+    std::array<UiRegion81,6> uiRegions81{};
+    int uiRegionCount81=0;
     bool hudLinear = true;
     uint64_t spatialSerial = 0;
     ComPtr<ID3D11Texture2D> spatialBlack, spatialWhite;
@@ -698,9 +703,25 @@ struct FrameLayers {
     XrCompositionLayerQuad information{XR_TYPE_COMPOSITION_LAYER_QUAD};
     XrCompositionLayerProjection projection{XR_TYPE_COMPOSITION_LAYER_PROJECTION};
     XrCompositionLayerProjectionView projected[2]{{XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW},{XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW}};
-    const XrCompositionLayerBaseHeader* layers[5]{};
+    std::array<XrCompositionLayerQuad,6> uiQuads81{};
+    const XrCompositionLayerBaseHeader* layers[11]{};
     uint32_t count = 0;
     bool hasFlat = false;
+    void AddUiRegions81(const Chain& chain,XrSpace space,const XrPosef& headPose,const UiRegion81* regions,int number) {
+        if(!regions||number<1||number>6||count+number>11)throw std::runtime_error("UI atlas layer budget exceeded");
+        for(int i=0;i<number;++i) {
+            const auto& r=regions[i];auto& quad=uiQuads81[i];
+            if(r.x<0||r.y<0||r.pixelsWide<=0||r.pixelsHigh<=0||uint64_t(r.x)+r.pixelsWide>chain.width||uint64_t(r.y)+r.pixelsHigh>chain.height)
+                throw std::runtime_error("UI atlas region outside texture");
+            if(!std::isfinite(r.width)||!std::isfinite(r.height)||!std::isfinite(r.distance)||!std::isfinite(r.offsetX)||!std::isfinite(r.offsetY)||r.width<=0||r.height<=0||r.distance<=0)
+                throw std::runtime_error("UI atlas invalid physical geometry");
+            quad={XR_TYPE_COMPOSITION_LAYER_QUAD};quad.space=space;quad.eyeVisibility=XR_EYE_VISIBILITY_BOTH;
+            quad.layerFlags=XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;quad.subImage=SubImage(chain);
+            quad.subImage.imageRect={{r.x,r.y},{r.pixelsWide,r.pixelsHigh}};
+            quad.pose=OffsetPose(headPose,r.offsetX,r.offsetY,-r.distance);quad.size={r.width,r.height};
+            layers[count++]=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&quad);
+        }
+    }
     void AddSpatial(const Chain& chain, XrSpace space, const XrPosef& pose, float width, float height) {
         spatial.space = space; spatial.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
         spatial.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
@@ -762,7 +783,7 @@ struct FrameLayers {
 bool PrepareHud(ID3D11Texture2D* black, ID3D11Texture2D* white) {
     if (hudFailed || !black || !white) return false;
     D3D11_TEXTURE2D_DESC b{}, w{}; black->GetDesc(&b); white->GetDesc(&w);
-    if (b.Width < 256 || b.Height < 256 || b.Width > 4096 || b.Height > 4096 ||
+    if (b.Width < 256 || b.Height < 256 || b.Width > uint32_t(uiMaxWidth81>0?uiMaxWidth81:4096) || b.Height > uint32_t(uiMaxHeight81>0?uiMaxHeight81:4096) ||
         b.Width != w.Width || b.Height != w.Height || b.Format != w.Format ||
         b.SampleDesc.Count != 1 || w.SampleDesc.Count != 1)
         throw std::runtime_error("HUD background pair must have identical single-sample dimensions and format");
@@ -1105,7 +1126,7 @@ void __stdcall RenderEvent(int eventId) {
     if (eventId != 1) return;
     std::lock_guard<std::mutex> lock(guard);
     if (!queued) return;
-    if (context) PollGpuPassQueries();
+    if (context) { PollGpuPassQueries(); PollMonitor81(); }
     const bool measure = diagnosticsEnabled.load();
     const auto renderStarted = measure ? TimingClock::now() : TimingClock::time_point{};
     const auto flushesBefore = blitFlushes, viewsBefore = sourceViewsCreated;
@@ -1189,7 +1210,8 @@ void __stdcall RenderEvent(int eventId) {
                 if (hudReady) {
                     try {
                         BlitHud(hudChain, job.hudBlack.Get(), job.hudWhite.Get(), true, job.hudLinear);
-                        composition.AddHud(hudChain, localSpace, head, job.hudWidth, job.hudHeight,
+                        if(job.uiRegionCount81)composition.AddUiRegions81(hudChain,localSpace,head,job.uiRegions81.data(),job.uiRegionCount81);
+                        else composition.AddHud(hudChain, localSpace, head, job.hudWidth, job.hudHeight,
                             job.hudDistance, job.hudX, job.hudY);
                     } catch (const std::exception& error) {
                         hudFailed = true;
@@ -1286,6 +1308,11 @@ int __cdecl RTX_Init(void* texture, float scale, const wchar_t* path) {
         const XrResult available = xrGetSystem(instance, &system, &systemId);
         if (available == XR_ERROR_FORM_FACTOR_UNAVAILABLE) { Log("Headset unavailable; retry later"); Destroy(); return 0; }
         Check(available, "xrGetSystem");
+        XrSystemProperties uiProperties81{XR_TYPE_SYSTEM_PROPERTIES};
+        Check(xrGetSystemProperties(instance,systemId,&uiProperties81),"xrGetSystemProperties UI budget");
+        uiMaxLayers81=int(uiProperties81.graphicsProperties.maxLayerCount);
+        uiMaxWidth81=int(std::min(uiProperties81.graphicsProperties.maxSwapchainImageWidth,8192u));
+        uiMaxHeight81=int(std::min(uiProperties81.graphicsProperties.maxSwapchainImageHeight,8192u));
         PFN_xrGetD3D11GraphicsRequirementsKHR requirementsFunction = nullptr;
         Check(xrGetInstanceProcAddr(instance, "xrGetD3D11GraphicsRequirementsKHR", reinterpret_cast<PFN_xrVoidFunction*>(&requirementsFunction)), "get D3D11 requirements function");
         XrGraphicsRequirementsD3D11KHR requirements{XR_TYPE_GRAPHICS_REQUIREMENTS_D3D11_KHR};
@@ -1490,6 +1517,7 @@ int __cdecl RTX_SetHudFrame(uint64_t serial, void* black, void* white, float wid
     std::lock_guard<std::mutex> lock(guard);
     if (!begun || queued || serial != stats.begun || hudFailed) return 0;
     job.hudBlack.Reset(); job.hudWhite.Reset(); job.hudSerial = 0;
+    job.uiRegionCount81=0;
     if (!black || !white || !std::isfinite(width) || !std::isfinite(height) || !std::isfinite(distance) ||
         !std::isfinite(x) || !std::isfinite(y) || width <= 0 || height <= 0 || distance <= 0) return 0;
     job.hudBlack = reinterpret_cast<ID3D11Texture2D*>(black);
@@ -1535,6 +1563,31 @@ int __cdecl RTX_TryResize(float scale) {
 }
 void* __cdecl RTX_GetRenderEvent() { return reinterpret_cast<void*>(&RenderEvent); }
 void* __cdecl RTX_GetGpuPassEvent() { return reinterpret_cast<void*>(&GpuPassEvent); }
+void* __cdecl RTX_GetMonitorEvent81() { return reinterpret_cast<void*>(&MonitorEvent81); }
+int __cdecl RTX_ReadMonitorTimings81(MonitorGpuTiming81* samples,int capacity) {
+    if(!samples||capacity<1)return 0;
+    std::unique_lock<std::mutex> lock(monitorSnapshotGuard81,std::try_to_lock);
+    if(!lock.owns_lock())return 0;
+    unsigned count=std::min(monitorCount81,unsigned(capacity));
+    for(unsigned i=0;i<count;++i)samples[i]=monitorReadings81[(monitorWrite81+monitorReadings81.size()-monitorCount81+i)%monitorReadings81.size()];
+    monitorCount81-=count;return int(count);
+}
+int __cdecl RTX_GetUiLimits81(int* layers,int* width,int* height) {
+    if(!layers||!width||!height)return 0;
+    std::unique_lock<std::mutex> lock(guard,std::try_to_lock);
+    if(!lock.owns_lock()||!session)return 0;
+    *layers=uiMaxLayers81;*width=uiMaxWidth81;*height=uiMaxHeight81;return 1;
+}
+int __cdecl RTX_SetUiRegions81(uint64_t serial,const UiRegion81* regions,int count) {
+    std::lock_guard<std::mutex> lock(guard);
+    if(!begun||queued||serial!=job.hudSerial||!regions||count<1||count>6||count+3>uiMaxLayers81)return 0;
+    for(int i=0;i<count;++i) {
+        const auto& r=regions[i];
+        if(r.x<0||r.y<0||r.pixelsWide<1||r.pixelsHigh<1||!std::isfinite(r.width)||!std::isfinite(r.height)||
+            !std::isfinite(r.distance)||!std::isfinite(r.offsetX)||!std::isfinite(r.offsetY)||r.width<=0||r.height<=0||r.distance<=0)return 0;
+    }
+    std::copy(regions,regions+count,job.uiRegions81.begin());job.uiRegionCount81=count;return 1;
+}
 int __cdecl RTX_ReadGpuPassTimings(GpuPassTiming* timings, int capacity) {
     if (!timings || capacity < GpuPassCount) return 0;
     std::unique_lock<std::mutex> lock(gpuPassSnapshotGuard, std::try_to_lock);
@@ -1581,6 +1634,21 @@ int __cdecl RTX_TestGpuPassTimings(void* testDevice) {
         printf("PASS D3D11 timestamps: %.6f ms, delayed three submissions, nonblocking lock, DONOTFLUSH reads\n", readings[0].sumMs);
         RTX_ReadGpuPassTimings(readings.data(), GpuPassCount);
         if (readings[0].observations) throw std::runtime_error("Timestamp observation counted twice");
+        MonitorEvent81(3,reinterpret_cast<void*>(uintptr_t(8123)));
+        for(int i=0;i<32;++i)context->ClearRenderTargetView(rtv.Get(),color);
+        MonitorEvent81(4,reinterpret_cast<void*>(uintptr_t(8123)));context->Flush();
+        MonitorGpuTiming81 monitorSamples[8]{};bool monitorObserved=false;
+        for(int attempt=0;attempt<1000;++attempt) {
+            PollMonitor81();int n=RTX_ReadMonitorTimings81(monitorSamples,8);
+            if(n) {
+                if(n!=1||monitorSamples[0].serial!=8123||monitorSamples[0].kind!=2||monitorSamples[0].valid!=1||monitorSamples[0].milliseconds<0)
+                    throw std::runtime_error("Monitor timestamp lost serial/kind/validity");
+                monitorObserved=true;break;
+            }
+            Sleep(1);
+        }
+        if(!monitorObserved||RTX_ReadMonitorTimings81(monitorSamples,8)!=0)throw std::runtime_error("Monitor timestamp missing or counted twice");
+        printf("PASS Monitor81 GPU timestamp retains original serial, clear kind and one delayed observation\n");
         ResetGpuPassQueries(); Destroy(); diagnosticsEnabled.store(previousDiagnostics); return 1;
     }
     catch (const std::exception& error) { Error(error); Destroy(); diagnosticsEnabled.store(previousDiagnostics); return -1; }
@@ -1897,6 +1965,19 @@ int __cdecl RTX_TestFlatHands() {
             std::abs(world.hud.pose.position.z + 2.1f) < .00001f,
             "HUD head-relative geometry must retain vertical/horizontal placement and physical distance");
         const float sine45 = std::sqrt(.5f);
+        UiRegion81 regions81[6]{};
+        for(int i=0;i<6;++i)regions81[i]={int32_t(i%3*640+4),int32_t(i/3*540+4),632,532,1.2f,.8f,.5f+i*.25f,.1f*i,-.05f*i};
+        FrameLayers atlas81;atlas81.AddProjection(handPair,space,stereoViews);
+        atlas81.AddUiRegions81(quad,space,hudHead,regions81,6);
+        require(sizeof(UiRegion81)==36&&atlas81.count==7,"UI atlas ABI and six independent planes");
+        for(int i=0;i<6;++i){const auto& panel=atlas81.uiQuads81[i];const auto& r=regions81[i];
+            require(panel.subImage.imageRect.offset.x==r.x&&panel.subImage.imageRect.offset.y==r.y&&panel.subImage.imageRect.extent.width==r.pixelsWide&&panel.subImage.imageRect.extent.height==r.pixelsHigh,"UI atlas region pixels preserved");
+            require(std::abs(panel.pose.position.z-(hudHead.position.z-r.distance))<.00001f&&std::abs(panel.pose.position.x-(hudHead.position.x+r.offsetX))<.00001f&&panel.size.width==r.width&&panel.eyeVisibility==XR_EYE_VISIBILITY_BOTH,"UI atlas physical depth and offsets preserved");
+            require(atlas81.layers[i+1]==reinterpret_cast<const XrCompositionLayerBaseHeader*>(&panel),"UI atlas layer order preserved");}
+        bool badRegion81=false;regions81[0].x=1900;
+        try{FrameLayers invalid;invalid.AddUiRegions81(quad,space,hudHead,regions81,1);}catch(const std::runtime_error&){badRegion81=true;}
+        require(badRegion81,"UI atlas rejects out-of-texture rectangle");
+        printf("PASS UI81: six atlas subrectangles, independent depths, offsets, ABI, layer order and invalid rectangle rejection\n");
         const XrPosef rotatedHead{{0,sine45,0,sine45},{0,1.5f,0}};
         FrameLayers rotatedHud;
         rotatedHud.AddHud(quad, space, rotatedHead, 3, 2, 2, .3f, -.5f);

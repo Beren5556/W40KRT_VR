@@ -123,11 +123,12 @@ namespace RTMaquetaXR
             float near = Mathf.Max(left.nearClipPlane, right.nearClipPlane);
             float far = Mathf.Min(left.farClipPlane, right.farClipPlane);
             float distance;
-            if (!LiveOverlayPolicy.TryDistance(near, far, WorldScale, out distance)) { HideLiveOverlay(); return; }
+            if (!LiveOverlayPolicy.TryDistance81(near, far, WorldScale, TurnConfirmationVisible ? .75f : _cfg.modMenuDistance81, out distance)) { HideLiveOverlay(); return; }
             var panelRect = (RectTransform)_liveRoot.transform;
             var panelSize = new Vector2(CurrentLivePanelWidth, CurrentLivePanelHeight);
             if (panelRect.sizeDelta != panelSize) panelRect.sizeDelta = panelSize;
             PlaceModMenu80(left,right,center,rotation,distance);
+            _livePlacementLimited80|=Mathf.Abs(distance-(TurnConfirmationVisible?.75f:_cfg.modMenuDistance81)*WorldScale)>.001f;
             if (_liveCanvas.worldCamera != left) _liveCanvas.worldCamera = left;
             // Present the canvas to Unity's normal UI rebuild before camera culling.
             // Camera callbacks then limit its rendering to the two VR eyes.

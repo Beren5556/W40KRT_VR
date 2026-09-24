@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 
 namespace RTMaquetaXR
@@ -19,21 +19,23 @@ namespace RTMaquetaXR
         // the 200 ms chrome refresh, which exposed a scene frame on opening.
         internal static bool ManagementWindowOpen66()
         {
-            if(_touchMenuWindows==null){SetManagementBackdrop66(null);return false;}
+            if(_touchMenuWindows==null){SetManagementBackdrop66(null);return NativeManagementOpen81();}
             RefreshPcUiRoots();
             bool open=FindTouchMenuWindow(out var window,out var view,out var model);
             SetManagementBackdrop66(_active && open ? view : null);
-            return open;
+            return open || NativeManagementOpen81();
         }
-        internal static bool ManagementPresentation => InNavigationMap || TouchMenuWindowVisible || NativeUiOnlyPresentation();
+        internal static bool ManagementScreen81 => NativeManagementOpen81() || TouchMenuWindowVisible || NativeUiOnlyPresentation();
+        internal static bool NavigationPresentation81 => InNavigationMap && !NativeManagementOpen81();
+        internal static bool ManagementPresentation => InNavigationMap || ManagementScreen81;
         internal static float MenuWindowWidth => Mathf.Clamp(_cfg.uiMenuWidth, .45f, 1f);
         internal static void SetMenuWindowWidth(float value) { _cfg.uiMenuWidth = Mathf.Clamp(value, .45f, 1f); MarkSettingsDirty(); }
-        internal static float HudPresentationWidth => InNavigationMap ? NavigationPanel.Width : ManagementPresentation ? MenuWindowWidth : _cfg.uiWidth;
-        internal static float HudPresentationDistance => InNavigationMap ? NavigationPanel.Distance : ManagementPresentation ? _cfg.uiMenuDistance : _cfg.uiDistance;
-        internal static float HudPresentationOffsetX => InNavigationMap ? NavigationPanel.OffsetX : ManagementPresentation ? _cfg.uiMenuOffsetX : _cfg.uiOffsetX;
-        internal static float HudPresentationOffsetY => InNavigationMap ? NavigationPanel.OffsetY : ManagementPresentation ? _cfg.uiMenuOffsetY : _cfg.uiOffsetY;
-        internal static float ManagementPresentationWidth => InNavigationMap ? NavigationPanel.Width : MenuWindowWidth;
-        internal static float ManagementPresentationAspect => InNavigationMap ? NavigationPanel.Aspect : MenuWindowAspect;
+        internal static float HudPresentationWidth => NavigationPresentation81 ? NavigationPanel.Width : ManagementPresentation ? MenuWindowWidth : _cfg.uiWidth;
+        internal static float HudPresentationDistance => NavigationPresentation81 ? NavigationPanel.Distance : ManagementPresentation ? _cfg.uiMenuDistance : _cfg.uiDistance;
+        internal static float HudPresentationOffsetX => NavigationPresentation81 ? NavigationPanel.OffsetX : ManagementPresentation ? _cfg.uiMenuOffsetX : _cfg.uiOffsetX;
+        internal static float HudPresentationOffsetY => NavigationPresentation81 ? NavigationPanel.OffsetY : ManagementPresentation ? _cfg.uiMenuOffsetY : _cfg.uiOffsetY;
+        internal static float ManagementPresentationWidth => NavigationPresentation81 ? NavigationPanel.Width : MenuWindowWidth;
+        internal static float ManagementPresentationAspect => NavigationPresentation81 ? NavigationPanel.Aspect : MenuWindowAspect;
         internal static float MenuWindowAspect => _cfg.uiMenuAspect;
         internal static void SetMenuWindowDistance(float value) { _cfg.uiMenuDistance = Mathf.Clamp(value, .5f, 3f); MarkSettingsDirty(); }
         internal static void SetMenuWindowOffsetX(float value) { _cfg.uiMenuOffsetX = Mathf.Clamp(value, -.65f, .65f); MarkSettingsDirty(); }
@@ -43,7 +45,7 @@ namespace RTMaquetaXR
             float next = _cfg.uiMenuAspect <= 0 ? (direction < 0 ? 2.4f : .8f) : Mathf.Round((_cfg.uiMenuAspect + direction * .1f) * 10) / 10;
             _cfg.uiMenuAspect = next < .79f || next > 2.41f ? 0 : next; MarkSettingsDirty();
         }
-        internal static float HudPresentationElementScale => InNavigationMap ? 1 : ManagementPresentation ? MenuWindowScale : _cfg.uiElementScale;
+        internal static float HudPresentationElementScale => NavigationPresentation81 ? 1 : ManagementPresentation ? MenuWindowScale : _cfg.uiElementScale;
         internal static float MenuWindowScale => Mathf.Clamp(_cfg.uiMenuScale, .65f, 1.5f);
         internal static void SetMenuWindowScale(float value) { _cfg.uiMenuScale = Mathf.Clamp(value, .65f, 1.5f); MarkSettingsDirty(); }
 

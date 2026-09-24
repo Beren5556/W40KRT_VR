@@ -194,6 +194,8 @@ namespace RTMaquetaXR
             return Math.Max(0, Math.Min(1, value));
         }
         internal static bool TryDistance(float near, float far, float scale, out float distance)
+            => TryDistance81(near, far, scale, .75f, out distance);
+        internal static bool TryDistance81(float near, float far, float scale, float wantedMetres, out float distance)
         {
             distance = 0;
             if (float.IsNaN(near) || float.IsInfinity(near) || float.IsNaN(far) || float.IsInfinity(far) || near < 0 || far <= near)
@@ -201,7 +203,7 @@ namespace RTMaquetaXR
             double gap = (double)far - near;
             double minimum = Math.Min(Math.Max(near * 1.5, 0.001), near + gap * 0.2);
             double maximum = near + gap * 0.7;
-            double wanted = float.IsNaN(scale) || float.IsInfinity(scale) ? 1 : Math.Max(0.3, scale * 0.75);
+            double wanted = float.IsNaN(scale) || float.IsInfinity(scale) ? 1 : Math.Max(0.3, scale * wantedMetres);
             distance = (float)Math.Max(minimum, Math.Min(maximum, wanted));
             return distance > near && distance < far;
         }

@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include "../../../../../native/neural/Neural.h"
 namespace xrfg::host77 {
 constexpr std::uint32_t abi = 77;
 struct Frame {
@@ -16,6 +17,7 @@ struct Status {
 };
 Frame snapshot() noexcept;
 bool eligible(const Frame& frame, std::int64_t display_time) noexcept;
+bool read_neural_status(RTN_BackendStatus& result) noexcept;
 bool neural_compatible(const Frame& frame) noexcept;
 void report(std::uint32_t state,std::uint32_t reason=0) noexcept;
 }

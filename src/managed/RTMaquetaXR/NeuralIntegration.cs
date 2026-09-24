@@ -43,7 +43,7 @@ namespace RTMaquetaXR
             }
             if (_cfg.neuralMode != 0)
             {
-                int preset = GUILayout.SelectionGrid(_cfg.neuralPreset, new[] { ModLocalization.Text("Preset Auto"), ModLocalization.Text("Preset K") }, 2);
+                int preset = NeuralPresets81.Values[GUILayout.SelectionGrid(NeuralPresets81.Index(_cfg.neuralPreset), NeuralPresets81.Labels(), 4)];
                 if (preset != _cfg.neuralPreset) { _cfg.neuralPreset = preset; MarkSettingsDirty(); }
                 float sharpness = Slider(ModLocalization.Text("NVIDIA sharpness"), _cfg.neuralSharpness, 0f, 1f, "0.00");
                 if (!Mathf.Approximately(sharpness, _cfg.neuralSharpness)) { _cfg.neuralSharpness = sharpness; MarkSettingsDirty(); }
@@ -67,7 +67,7 @@ namespace RTMaquetaXR
                 MarkSettingsDirty();
             }
             float scale = requested == 3 ? _cfg.neuralScale : 1f;
-            int preset = _cfg.neuralPreset == 1 ? 11 : 0;
+            int preset = NeuralPresets81.Normalize(_cfg.neuralPreset);
             bool configurationChanged = requested != _neuralAppliedMode ||
                 (requested != 0 && (scale != _neuralAppliedScale || preset != _neuralAppliedPreset));
             if (_neuralHooksInstalled && configurationChanged)
@@ -133,7 +133,7 @@ namespace RTMaquetaXR
             RequestedMode = _cfg.neuralMode, AppliedMode = _neuralAppliedMode,
             Installed = _neuralHooksInstalled, Hook = NeuralTemporalHook.Snapshot(),
             InputScale = _neuralAppliedScale, RequestedInputScale = _cfg.neuralScale,
-            RequestedPreset = _cfg.neuralPreset == 1 ? "K" : "Auto", Sharpness = _cfg.neuralSharpness,
+            RequestedPreset = NeuralPresets81.Name(_cfg.neuralPreset), Sharpness = _cfg.neuralSharpness,
             OriginalTaaComputedForFallback = false, RawFallbackActive = _neuralRawFallback, FallbackAntialiasing = "None",
             SameFrameGeometryStereo = true
         };

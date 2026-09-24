@@ -72,7 +72,7 @@ void CapturePreset(const char* s){
  const char* marker="using title default Preset ";auto value=strstr(line,marker);if(value&&value>=end)value=nullptr;
  if(value)value+=strlen(marker);else{marker="Using App hint Preset ";value=strstr(line,marker);if(value&&value<end)value+=strlen(marker);else value=nullptr;}
  if(value&&value>=end)value=nullptr;
- if(!value||value[0]<'J'||value[0]>'M'||(value[1]&&value[1]!='\r'&&value[1]!='\n'&&value[1]!=' '))return;
+ if(!value||!((value[0]>='A'&&value[0]<='F')||(value[0]>='J'&&value[0]<='M'))||(value[1]&&value[1]!='\r'&&value[1]!='\n'&&value[1]!=' '))return;
  uint32_t selected=uint32_t(value[0]-'A'+1);auto& eye=*creatingEye;
  if(eye.identifiedPreset!=UINT32_MAX&&eye.identifiedPreset!=selected)eye.presetConflict=true;
  if(!eye.presetConflict)eye.identifiedPreset=selected;else eye.identifiedPreset=UINT32_MAX;
@@ -180,8 +180,8 @@ void EnsureGeneration(const Job& j,const D3D11_TEXTURE2D_DESC& destination){
  current->transfer=std::make_unique<rtn::ColorTransfer>(device.Get());
  for(auto& e:current->eyes){
   Ngx(NVSDK_NGX_D3D11_AllocateParameters(&e.parameters),RTN_REASON_CREATE,"Allocate eye parameters");
-  if(config.featureFlags&RTN_FEATURE_FORCE_PRESET_K){
-   for(const char* key:{NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_DLAA,NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Quality,NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Balanced,NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Performance,NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_UltraPerformance})e.parameters->Set(key,uint32_t(NVSDK_NGX_DLSS_Hint_Render_Preset_K));
+  if(config.requestedPreset != 0){
+   for(const char* key:{NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_DLAA,NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Quality,NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Balanced,NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Performance,NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_UltraPerformance})e.parameters->Set(key,config.requestedPreset);
   }
   NVSDK_NGX_DLSS_Create_Params create{};create.Feature.InWidth=a.renderWidth;create.Feature.InHeight=a.renderHeight;
   create.Feature.InTargetWidth=a.outputWidth;create.Feature.InTargetHeight=a.outputHeight;create.Feature.InPerfQualityValue=Quality();create.InFeatureCreateFlags=CreationFlags();
@@ -197,7 +197,7 @@ void EnsureGeneration(const Job& j,const D3D11_TEXTURE2D_DESC& destination){
  if(current->eyes[0].feature==current->eyes[1].feature)throw Error(RTN_REASON_CREATE,"NGX returned shared eye feature");
  RefreshRuntimeIdentity();runtimeIdentity.End();backend.state=RTN_STATE_READY;backend.reason=RTN_REASON_NONE;
  Log("Two independent features ready, generation="+std::to_string(a.generation));
- Log(std::string("Preset requested=")+(config.featureFlags&RTN_FEATURE_FORCE_PRESET_K?"K":"Auto")+"; identifiedLeft="+std::to_string(current->eyes[0].identifiedPreset)+" identifiedRight="+std::to_string(current->eyes[1].identifiedPreset)+"; UINT32_MAX=not identified; evidence is runtime creation log, not echoed hints");
+ Log(std::string("Preset requested=")+std::to_string(config.requestedPreset)+"; identifiedLeft="+std::to_string(current->eyes[0].identifiedPreset)+" identifiedRight="+std::to_string(current->eyes[1].identifiedPreset)+"; UINT32_MAX=not identified; evidence is runtime creation log, not echoed hints");
 }
 void Evaluate(Job& j,const std::array<D3D11_TEXTURE2D_DESC,5>& d){
  const auto& a=j.data;auto& e=current->eyes[a.eye];
@@ -284,6 +284,7 @@ int __cdecl RTN_Configure(const RTN_Config* value){
  std::lock_guard<std::mutex> lock(mutex);
  try{
   if(!value||value->size!=sizeof(*value)||value->abi!=RTN_ABI_VERSION)return Reject(RTN_REASON_ABI,"Invalid neural configuration ABI");
+  if(value->reserved || (value->featureFlags&RTN_FEATURE_FORCE_PRESET_K) || !(value->requestedPreset==0 || (value->requestedPreset>=10 && value->requestedPreset<=13))) return Reject(RTN_REASON_CONFIG,"Invalid neural preset");
   runtimeIdentity.Configure(value->generation,value->featureDirectory?value->featureDirectory:L"");
   if(!value->generation||value->mode>RTN_MODE_ULTRA_PERFORMANCE||value->featureFlags&~uint32_t(127)||!value->featureDirectory)return Reject(RTN_REASON_CONFIG,"Invalid neural configuration generation, mode, flags or search directory");
   if(stopping)return Reject(RTN_REASON_CANCELLED,"Neural resources are still draining; retry configuration after Idle");
@@ -329,6 +330,6 @@ int __cdecl RTN_GetJobStatus(uint64_t ticket,RTN_JobStatus* status){
  for(auto it=receipts.rbegin();it!=receipts.rend();++it)if(it->ticket==ticket){*status=*it;return 1;}return 0;
 }
 int __cdecl RTN_GetBackendStatus(RTN_BackendStatus* status){if(!status||status->size!=sizeof(*status)||status->abi!=RTN_ABI_VERSION)return 0;std::lock_guard<std::mutex> lock(mutex);backend.pendingJobs=uint32_t(jobs.size());backend.retiredBatches=uint32_t(retired.size());*status=backend;return 1;}
-int __cdecl RTN_GetPresetStatus(RTN_PresetStatus* status){if(!status||status->size!=sizeof(*status)||status->abi!=RTN_ABI_VERSION)return 0;std::lock_guard<std::mutex> lock(mutex);*status={sizeof(*status),RTN_ABI_VERSION,config.generation,(config.featureFlags&RTN_FEATURE_FORCE_PRESET_K)?11u:0u,UINT32_MAX,UINT32_MAX,0};if(current&&current->id==config.generation&&current->eyes[0].feature&&current->eyes[1].feature){status->identifiedLeft=current->eyes[0].identifiedPreset;status->identifiedRight=current->eyes[1].identifiedPreset;if(status->identifiedLeft!=UINT32_MAX&&status->identifiedRight!=UINT32_MAX)status->evidence=1;}return 1;}
+int __cdecl RTN_GetPresetStatus(RTN_PresetStatus* status){if(!status||status->size!=sizeof(*status)||status->abi!=RTN_ABI_VERSION)return 0;std::lock_guard<std::mutex> lock(mutex);*status={sizeof(*status),RTN_ABI_VERSION,config.generation,config.requestedPreset,UINT32_MAX,UINT32_MAX,0};if(current&&current->id==config.generation&&current->eyes[0].feature&&current->eyes[1].feature){status->identifiedLeft=current->eyes[0].identifiedPreset;status->identifiedRight=current->eyes[1].identifiedPreset;if(status->identifiedLeft!=UINT32_MAX&&status->identifiedRight!=UINT32_MAX)status->evidence=1;}return 1;}
 int __cdecl RTN_GetRuntimeStatus(RTN_RuntimeStatus* status){if(!status||status->size!=sizeof(*status)||status->abi!=RTN_ABI_VERSION)return 0;*status=runtimeIdentity.Snapshot();return 1;}
 void __cdecl RTN_RequestShutdown(){try{std::lock_guard<std::mutex> lock(mutex);if(stopping)return;stopping=true;shutdownFlushed=false;backend.state=RTN_STATE_STOPPING;for(auto& entry:jobs)Receipt(*entry.second,RTN_JOB_CANCELLED,RTN_REASON_CANCELLED,0,0);jobs.clear();}catch(...){}}

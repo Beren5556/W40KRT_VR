@@ -15,7 +15,9 @@ namespace RTMaquetaXR
             {"uiMenuOffsetX",ApprovedUserDefaults.MenuX},{"uiMenuOffsetY",ApprovedUserDefaults.MenuY},{"uiMenuScale",ApprovedUserDefaults.MenuText},
             {"mapGlobalWidth",.82f},{"mapGlobalDistance",.5f},{"mapGlobalAspect",0f},{"mapGlobalOffsetX",0f},{"mapGlobalOffsetY",0f},{"mapGlobalZoom",ApprovedUserDefaults.MapZoom},
             {"mapSystemWidth",.82f},{"mapSystemDistance",.5f},{"mapSystemAspect",0f},{"mapSystemOffsetX",0f},{"mapSystemOffsetY",0f},{"mapSystemZoom",ApprovedUserDefaults.MapZoom},
-            {"touchHintX",0f},{"touchHintY",0f},{"touchHintSize",1f},{"modMenuOffsetX",0f},{"modMenuOffsetY",0f},
+            // The stored mod offset predates centered defaults: +.20 cancels
+            // its legacy -.20 base without reinterpreting any existing file.
+            {"touchHintX",0f},{"touchHintY",0f},{"touchHintSize",1f},{"modMenuOffsetX",0f},{"modMenuOffsetY",.20f},
             {"uiRasterMode",ApprovedUserDefaults.Raster},{"uiFullResolution",true}
         };
         public static void CopyTo(object settings, bool includeWorld)

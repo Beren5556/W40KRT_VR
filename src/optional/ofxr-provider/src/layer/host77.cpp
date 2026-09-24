@@ -10,14 +10,7 @@ std::mutex mutex;
 Frame current;
 Status status;
 bool initialized{};
-// Read-only ABI from RTNeural 1. The provider queries it on the render thread,
-// after both real eye jobs, so a same-frame NGX failure cannot be interpolated.
-struct NeuralStatus {
-    std::uint32_t size{sizeof(NeuralStatus)},abi{1},state{},reason{};
-    std::uint64_t generation{},failure{},left{},right{};
-    std::uint32_t pending{},retired{},major{},minor{},patch{},build{};
-};
-static_assert(sizeof(NeuralStatus)==72);
+
 }
 Frame snapshot() noexcept {
     std::scoped_lock lock(mutex);
@@ -27,15 +20,20 @@ bool eligible(const Frame& frame,std::int64_t display_time) noexcept {
     return frame.size==sizeof(Frame)&&frame.version==abi&&frame.epoch&&frame.serial&&
         frame.display_time>0&&frame.display_time==display_time&&(frame.flags&1)!=0&&(frame.flags&~3u)==0;
 }
-bool neural_compatible(const Frame& frame) noexcept {
-    if((frame.flags&2)==0)return true;
+// Query the same contract used by the shipped neural backend; CPU-only.
+bool read_neural_status(RTN_BackendStatus& result) noexcept {
+    result={};result.size=sizeof(result);result.abi=RTN_ABI_VERSION;
     HMODULE module=GetModuleHandleW(L"RTNeural.dll");
     if(!module)return false;
-    using Read=int(__cdecl*)(NeuralStatus*);
+    using Read=int(__cdecl*)(RTN_BackendStatus*);
     auto read=reinterpret_cast<Read>(GetProcAddress(module,"RTN_GetBackendStatus"));
-    NeuralStatus result;
-    return read&&read(&result)==1&&result.state==2&&result.reason==0&&
-        result.generation==frame.neural_generation&&result.left==frame.game_frame&&result.right==frame.game_frame;
+    return read&&read(&result)==1;
+}
+bool neural_compatible(const Frame& frame) noexcept {
+    if((frame.flags&2)==0)return true;
+    RTN_BackendStatus result{};
+    return read_neural_status(result)&&result.state==RTN_STATE_READY&&result.reason==RTN_REASON_NONE&&
+        result.generation==frame.neural_generation&&result.lastLeftFrame==frame.game_frame&&result.lastRightFrame==frame.game_frame;
 }
 void report(std::uint32_t state,std::uint32_t reason) noexcept {
     std::scoped_lock lock(mutex);status.state=state;status.reason=reason;status.epoch=current.epoch;

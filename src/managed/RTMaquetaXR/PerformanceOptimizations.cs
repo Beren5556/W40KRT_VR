@@ -110,6 +110,7 @@ namespace RTMaquetaXR
 
         static void StopPerformanceHooks()
         {
+            StopFollowCollision81();
             ReleaseEngineCaches58();
             StopEngineEffectOptimizations();
             StopNativeUiWarnings();
@@ -129,6 +130,8 @@ namespace RTMaquetaXR
             if (_desktopMirrorHook) RenderPipelineManager.endContextRendering -= CopyEyeToDesktop;
             _desktopMirrorHook = false;
             _desktopRecovery.Reset(); _desktopFallback = false;
+            MonitorHeadsetRecovery81 = false;
+            _monitorCopyProbe81=false;ResetMonitorEvidence81();
             _stereoPreparedFrame = _desktopSkippedFrame = _desktopHandledFrame = -1;
         }
         static readonly ModStageFrames79 _modStageFrames79 = new ModStageFrames79();
@@ -166,6 +169,7 @@ namespace RTMaquetaXR
                 OvertipBatches = OvertipBatchSnapshot(),
                 TemporalInputs = TemporalInputProbeSnapshot(),
                 MaxQueuedFrames = QualitySettings.maxQueuedFrames,
+                Monitor81 = MonitorEvidenceSnapshot81(),
                 CameraFocus = TouchCameraFocusSnapshot(),
                 PcStartup = TouchPcStartupSnapshot(),
                 LoadingStereoFrames = _loadingStereoFrames,

@@ -22,19 +22,22 @@ namespace RTMaquetaXR
                     _nativeHintWindow=TouchSelectionCallFactory.FieldGetter(PcUiPath.Field(type,"m_WindowAnimator"));
                     _harmony.Patch(AccessTools.Method(type,"BindViewImplementation",Type.EmptyTypes),
                         postfix:new HarmonyMethod(typeof(Main),nameof(NativeHintBound)));
+                    var large=AccessTools.TypeByName("Kingmaker.UI.MVVM.View.Tutorial.PC.TutorialModalWindowPCView");
+                    _harmony.Patch(AccessTools.Method(large,"BindViewImplementation",Type.EmptyTypes),
+                        postfix:new HarmonyMethod(typeof(Main),nameof(NativeHintBound)));
                     _nativeHintInstalled=true;
                 }
                 // Reacquire already-bound hints when VR resumes after restoring
                 // their original positions. The hook itself is installed once.
                 foreach(var view in UnityEngine.Object.FindObjectsByType(type,FindObjectsSortMode.None))NativeHintBound(view as Component);
+                foreach(var view in UnityEngine.Object.FindObjectsByType(AccessTools.TypeByName("Kingmaker.UI.MVVM.View.Tutorial.PC.TutorialModalWindowPCView"),FindObjectsSortMode.None))NativeHintBound(view as Component);
             }
             catch(Exception error) { _log.Error("[ui/tutorial-position] "+error.Message); }
         }
         static void NativeHintBound(Component __instance)
         {
             if(__instance==null)return;
-            var window=(_nativeHintWindow?.Invoke(__instance) as Component)?.transform as RectTransform;
-            if(window!=null && !_nativeHintOffsets.ContainsKey(window))_nativeHintOffsets.Add(window,new NativeHintOffset());
+            if(!_tutorialViews81.Contains(__instance))_tutorialViews81.Add(__instance);
         }
         internal static void UpdateNativeHintPlacement()
         {
@@ -82,6 +85,7 @@ namespace RTMaquetaXR
                     if(pair.Key.localScale==pair.Value.AppliedScale)pair.Key.localScale=pair.Value.NativeScale;
                 }
             _nativeHintOffsets.Clear();
+            _tutorialViews81.Clear();
         }
         static Bounds NativeHintBounds80(RectTransform rect,RectTransform parent)
         {

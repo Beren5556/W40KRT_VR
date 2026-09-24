@@ -18,7 +18,7 @@ namespace RTMaquetaXR
         static void FollowTouchSelectionFrame(Component leader, bool moving, XrFrame frame,
             Vector3 referencePosition, Quaternion referenceRotation)
         {
-            if (FollowWithoutRecenter80(leader, moving)) return;
+            if (FollowWithoutRecenter80(leader, moving, frame, referencePosition, referenceRotation)) return;
             if (!moving && !_touchFollowWasMoving && !_touchThirdPersonFollower.Settling && !_touchFollowPlacementSettling) return;
             if(_followMeasuredActor76!=leader)
             {

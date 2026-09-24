@@ -26,18 +26,16 @@ The approach is reminiscent of **Demeo**, while preserving the original game's c
 
 The **Star map** is the warp-route and travel interface. The **Galactic map** shows planets within a system. Orders, abilities, movement rules, and game data remain part of the original game.
 
-## What's new in 0.9.80
+## What's new in 0.9.81
 
-- A single shared English installer, `INSTALL.cmd`, for all supported headsets. There are no separate installers for individual headset or runtime choices.
-- Launcher selection for headset, connection, OpenXR runtime, rendering mode, DLSS quality, and experimental OFXR.
-- Meta Quest through VDXR or Meta Link/Air Link, PICO 4/4 Ultra through VDXR, and Pimax Dream Air/SE SLAM through Pimax Play native OpenXR.
-- Automatic follow recentering now starts off. Right-stick party movement follows horizontally while retaining the current tabletop height, angle, and scale; the previous framing remains available as an option.
-- Direct **Interface position and size** controls for the HUD, management screens, maps, control hints, and F1 menu.
-- Independent F1 positioning and improved fitting within the visible area of both eyes.
-- Native tutorial hints use their complete bounds for improved placement and legibility.
-- The warp-route Star map uses its native right options bar; the system/planet map retains its right wheel.
-- Improved startup diagnostics distinguish a runtime/GPU mismatch from insufficient D3D11 capability and allow copying details with **Ctrl+C**.
-- Safer Steam startup: the launcher checks that the Steam edition can connect to Steam before saving changes or opening the game.
+- More flexible positioning for dialogue, management, large tutorial, and tip panels, with corrected clipping and revised initial layouts.
+- Shared horizontal, vertical, and distance controls for the mod menu and its illustrated tutorial.
+- Unified management-screen settings while retaining the game's native navigation and window behaviour.
+- Improved camera follow near scenery and 40% faster default stick rotation and tilt.
+- Selectable DLSS and DLAA models: **Automatic, J, K, L, and M**, subject to GPU and runtime support.
+- A main-menu switch for monitor output, useful when comparing performance or keeping the VR image off the desktop.
+- Revised clean-install defaults for interface placement, camera movement, diagnostics, OFXR, and monitor output.
+- Safer upgrades: the installer creates and verifies a recoverable backup before applying the revised settings and saved layouts.
 
 ## Compatibility
 
@@ -69,7 +67,7 @@ The mod's own interface is available in English and Spanish. Native game text an
 
 The package includes installation and removal tools. You do not need to compile the source, install RTVR separately, or add an external mod manager.
 
-To update, run the installer from the new package while the game is closed. Existing settings and a user-selected DLSS DLL are preserved. To remove this beta, use **UNINSTALL.cmd** from the matching package.
+To update from an earlier version, run the installer from the new package while the game is closed. Version 0.9.81 introduces revised layout defaults, so the installer explains which mod settings and saved layouts will be reset and asks before continuing. It then creates and verifies a recoverable backup and displays its location. If the backup cannot be verified, the reset is cancelled. The selected OpenXR runtime, user-selected DLSS DLL, `Params.xml`, saves, and unrelated mods are preserved. Reinstalling 0.9.81 preserves the current mod settings. To remove this beta, use **UNINSTALL.cmd** from the matching package.
 
 The installer also creates a **Rogue Trader VR** shortcut using the icon from the locally installed game. Starting the game normally through Steam or `WH40KRT.exe` remains flat; use the launcher or its shortcut for VR.
 
@@ -136,11 +134,11 @@ Controls adapt to the current game context.
 
 On the Star and Galactic maps, use the right stick to pan and the left stick up/down to zoom. The warp-route Star map uses the native right options bar; the system/planet map retains its right wheel. Native windows and dialogue use the right-hand pointer with the right trigger or **A**; the right stick scrolls and **B** goes back when allowed by the game.
 
-The mod includes contextual help and an illustrated in-game control guide. A separate English/Spanish quick-reference image will be added to this page.
+The mod includes contextual help and an illustrated in-game control guide.
 
 ## Beta status
 
-W40KRT_VR remains in public beta. Version 0.9.80 expands headset setup and interface controls, and the listed Meta, PICO, and Pimax paths have been physically validated. Performance can still vary between PCs and during combat or complex scenes.
+W40KRT_VR remains in public beta. Version 0.9.81 expands interface placement, camera control, DLSS/DLAA selection, monitor-output control, and experimental OFXR compatibility. The listed Meta, PICO, and Pimax paths have been physically validated. Performance can still vary between PCs and during combat or complex scenes, and this release does not claim a measured FPS improvement.
 
 This is a personal project without formal technical support. Experiences and questions may be discussed in community forums, without a commitment by the author to respond, investigate, or provide fixes.
 

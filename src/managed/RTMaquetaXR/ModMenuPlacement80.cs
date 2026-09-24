@@ -19,14 +19,17 @@ namespace RTMaquetaXR
         {
             var inverse=Quaternion.Inverse(rotation);
             MenuEyePlanes80(left,center,inverse,0); MenuEyePlanes80(right,center,inverse,4);
-            bool ordinary=!TurnConfirmationVisible&&!TouchQuickGuideVisible;
-            float width=distance*(TurnConfirmationVisible?.52f:TouchQuickGuideVisible?TouchQuickGuideLayout.WidthAtDistance:.9f);
+            bool ordinary=!TurnConfirmationVisible;
+            float width=TurnConfirmationVisible?distance*.52f:WorldScale*.75f*(TouchQuickGuideVisible?TouchQuickGuideLayout.WidthAtDistance:.9f);
             float height=width*CurrentLivePanelHeight/CurrentLivePanelWidth;
             var cover=HudPanelLayout.CoverViews(distance,1,float.MaxValue,CurrentLivePanelWidth,_menuPlanes80);
             float x=ordinary?cover.Width*_cfg.modMenuOffsetX:0;
             float y=ordinary?cover.Height*(-.20f+_cfg.modMenuOffsetY):0;
-            if(PanelFit80.Fit(distance,width,height,x,y,_menuPlanes80,out var fitted))
-            {x=fitted.X;y=fitted.Y;width=fitted.Width;_livePlacementLimited80=fitted.Limited;}
+            // A common envelope keeps the anchor stable when opening the guide.
+            float envelopeWidth=ordinary?Mathf.Max(width,WorldScale*.75f*.9f):width;
+            float envelopeHeight=ordinary?Mathf.Max(height,envelopeWidth*.65f):height;
+            if(PanelFit80.Fit(distance,envelopeWidth,envelopeHeight,x,y,_menuPlanes80,out var fitted))
+            {x=fitted.X;y=fitted.Y;width*=fitted.Width/envelopeWidth;_livePlacementLimited80=fitted.Limited;}
             else {x=y=0;_livePlacementLimited80=true;}
             PositionHudHelper(_liveRoot.transform,center+rotation*new Vector3(x,y,distance),rotation,width/CurrentLivePanelWidth);
         }

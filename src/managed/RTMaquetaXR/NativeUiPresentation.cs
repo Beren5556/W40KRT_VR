@@ -11,6 +11,17 @@ namespace RTMaquetaXR
     {
         static Func<bool> _nativeUiOnly;
         static bool _nativeUiPresentationAttempted;
+        static Func<bool> _nativeManagement81;
+        static bool _nativeManagementAttempted81;
+        internal static bool NativeManagementOpen81()
+        {
+            if(!_nativeManagementAttempted81) {
+                _nativeManagementAttempted81=true;
+                try { _nativeManagement81=NativeUiPresentationContract.CreateManagement81(AccessTools.TypeByName); }
+                catch(Exception error) { _log.Error("[ui/management] Native ownership unavailable: " + error.Message); }
+            }
+            return _nativeManagement81 != null && _nativeManagement81();
+        }
         internal static bool NativeUiOnlyPresentation()
         {
             if (!_nativeUiPresentationAttempted)

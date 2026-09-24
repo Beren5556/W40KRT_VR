@@ -165,6 +165,7 @@ namespace RTMaquetaXR
                 Main.RecordModStage("EyeSetup", configurationStarted);
                 long uiStarted = Main.DiagnosticTimestamp();
                 Main.PositionWorldSpaceUi(source, centerPosition, centerRotation);
+                Main.PrepareNativeGroups81(centerPosition, centerRotation);
                 Main.RecordModStage("UiPlacementAndPicking", uiStarted);
                 long overtipStarted = Main.DiagnosticTimestamp();
                 Main.PrepareWorldPresentation75(left,right,centerPosition);
@@ -282,7 +283,9 @@ namespace RTMaquetaXR
                     Main.CompleteDesktopMirrorFrame(stereo);
                     Main.RecordFramePerformance(stereo);
                     bool loadingFallback = Main.NativeLoadingFallback;
-                    RenderTexture flat = haveReference && !stereo && (Main.PresentationQuadWanted || loadingFallback) && frame.valid != 0 ? Main.CaptureFlatFrame() : null;
+                    RenderTexture flat = haveReference && !stereo && (Main.PresentationQuadWanted || loadingFallback || Main.MonitorHeadsetRecovery81) && frame.valid != 0 ? Main.CaptureFlatFrame() : null;
+                    // Flat UI is copied for the headset before hiding the window.
+                    Main.CompleteMonitorOutput81(frame.serial, stereo, flat != null);
                     RenderTexture submitLeft = stereo ? Main.EyeL : null, submitRight = stereo ? Main.EyeR : null;
                     if (haveReference && Main.LoadingStereoWanted(stereo, Main.PresentationQuadWanted || loadingFallback, Main.ObservedNativeLoading,
                         frame.valid != 0, frame.shouldRender != 0, Time.unscaledTime))

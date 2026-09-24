@@ -45,6 +45,7 @@ namespace RTMaquetaXR
             ResetPerformanceWindow(); _consecutiveStereoFrames = 0; _lastGpuTimestamp = 0;
             _renderTargets.Clear(); _nextTargetDiagnostic = 0;
             _modStageFrames79.Clear();
+            ResetMonitorEvidence81();
             _currentModStages.Clear(); _modStageFrame = -1; _havePerformanceContext = false;
             _hbBegins.Clear(); _hbEnds.Clear(); _hbNames.Clear();
             _restoreChecks.Clear(); _restoreCheckDue = 0;

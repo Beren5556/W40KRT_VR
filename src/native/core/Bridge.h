@@ -38,6 +38,8 @@ struct GpuPassTiming {
     uint64_t observations, rejected;
     double sumMs, peakMs;
 };
+struct MonitorGpuTiming81 { uint64_t serial; int32_t kind, valid; double milliseconds; };
+struct UiRegion81 { int32_t x,y,pixelsWide,pixelsHigh; float width,height,distance,offsetX,offsetY; };
 // Independent ABI: Frame remains 144 bytes. Pose flags use the low four
 // XrSpaceLocationFlags bits (valid orientation/position, tracked orientation/position).
 enum TouchControl : uint32_t {
@@ -93,6 +95,8 @@ RTXR int __cdecl RTX_GetSpatialStatus();
 RTXR int __cdecl RTX_SetHudFrame(uint64_t serial, void* black, void* white,
     float width, float height, float distance, float x, float y, int linear);
 RTXR int __cdecl RTX_GetHudStatus();
+RTXR int __cdecl RTX_SetUiRegions81(uint64_t serial,const UiRegion81* regions,int count);
+RTXR int __cdecl RTX_GetUiLimits81(int* layers,int* width,int* height);
 RTXR uint64_t __cdecl RTX_GetTrackingOriginRevision();
 RTXR void* __cdecl RTX_GetRenderEvent();
 // 0 retains all resources until the queued CPU event and prior GPU copies retire.
@@ -102,6 +106,8 @@ RTXR void __cdecl RTX_GetBeginTiming(BeginTiming* timing);
 RTXR int __cdecl RTX_GetRenderTiming(RenderTiming* timing);
 // Event IDs: pass * 2 + 1 begins, pass * 2 + 2 ends (0 <= pass < 128).
 RTXR void* __cdecl RTX_GetGpuPassEvent();
+RTXR void* __cdecl RTX_GetMonitorEvent81();
+RTXR int __cdecl RTX_ReadMonitorTimings81(MonitorGpuTiming81* samples,int capacity);
 // Try-copy and clear completed observations. Returns 0 if the snapshot is busy.
 RTXR int __cdecl RTX_ReadGpuPassTimings(GpuPassTiming* timings, int capacity);
 // Atomic switch for periodic diagnostic breadcrumbs. Error/state logs remain on.

@@ -24,7 +24,7 @@ namespace RTMaquetaXR
             AddRelease58(entries);
             AddRelease59(entries); AddGuide59(entries);
             AddRelease61(entries); AddRelease62(entries); AddRelease63(entries); AddGuide64(entries); AddRelease65(entries); AddRelease71(entries); AddRelease72(entries); AddRelease73(entries); AddRelease74(entries);
-            AddRelease77(entries); AddRelease80(entries);
+            AddRelease77(entries); AddRelease80(entries); AddRelease81(entries);
             return entries;
         }
         static partial void AddCore(Dictionary<string, string> strings);
@@ -58,6 +58,7 @@ namespace RTMaquetaXR
         static partial void AddRelease74(Dictionary<string, string> strings);
         static partial void AddRelease77(Dictionary<string, string> strings);
         static partial void AddRelease80(Dictionary<string, string> strings);
+        static partial void AddRelease81(Dictionary<string, string> strings);
         static void Add(Dictionary<string, string> entries, string source, string translation)
         {
             if (string.IsNullOrEmpty(source) || string.IsNullOrEmpty(translation))

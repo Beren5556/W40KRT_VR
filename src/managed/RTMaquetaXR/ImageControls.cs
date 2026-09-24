@@ -60,10 +60,13 @@ namespace RTMaquetaXR
             advanced.Options[advanced.Options.Count - 3].Menu.Options.Insert(0, language);
             var placement = InterfacePlacementOptions80(advanced);
             var recenter = FollowRecenterOption80();
+            var monitor = ImageToggle("Monitor image", "Show VR on the monitor. Off keeps the window black and skips its eye copy and redundant world view. Headset menus remain available; Unity may still present the window.",
+                () => _cfg.monitorImage, value => { _cfg.monitorImage = value; _desktopRecovery.Reset(); _desktopFallback = false; });
+            performance.Options.Insert(0, monitor);
             FindLayoutOption80(advanced,"Tabletop").Menu.Options.Insert(0,recenter);
             return _qualityRoot = new OverlayMenu("Main menu", new[] {
                 QualityPresetOption(), image.Options[0], image.Options[1], image.Options[2], image.Options[6], placement, ofxr, combatEffects, runtime, language,
-                ExplorationZoomLimitOption(), recenter, allDiagnostics, SaveCustomOption(), ResetSettingsOption(),
+                ExplorationZoomLimitOption(), recenter, monitor, allDiagnostics, SaveCustomOption(), ResetSettingsOption(),
                 advanced.Options.Find(option => option.LabelKey == "Help · Touch controls"), AdvancedWarningOption(advanced)
             }, root: true);
         }
@@ -84,8 +87,8 @@ namespace RTMaquetaXR
                 (_cfg.neuralMode >= 2 ? _cfg.neuralSharpness : _cfg.taaSharpness).ToString("0.00", ModLocalization.Culture),
                 direction => SetImageSharpness((_cfg.neuralMode >= 2 ? _cfg.neuralSharpness : _cfg.taaSharpness) + direction * .05f),
                 () => _cfg.neuralMode >= 2 ? _cfg.neuralSharpness : _cfg.taaSharpness),
-            ImageValue("NVIDIA model preset", "Auto lets NVIDIA choose its model. K requests that preset for DLSS/DLAA. This does not change resolution. The status distinguishes the request from the model that can be identified.", () => _cfg.neuralPreset == 1 ? "K" : ModLocalization.Text("Auto (NVIDIA selection)"),
-                direction => { _cfg.neuralPreset = 1 - _cfg.neuralPreset; MarkSettingsDirty(); }),
+            ImageValue("NVIDIA model preset", "Choose Auto, J, K, L or M for both DLSS and DLAA. The NVIDIA runtime may substitute the request. Resolution is unchanged; the status separates requested and identified models.", () => NeuralPresets81.Label(_cfg.neuralPreset),
+                direction => { _cfg.neuralPreset = NeuralPresets81.Cycle(_cfg.neuralPreset, direction); MarkSettingsDirty(); }),
             new OverlayOption { Label = "NVIDIA runtime", Description = "Recommended DLSS: 310.9.1.0. Other versions and NVIDIA overrides are allowed. Version and source describe the runtime detected by NGX; unknown identity does not block it. A real backend failure displays the current image without antialiasing. Restart the game after replacing a DLL.",
                 Value = NeuralTemporalHook.RuntimeStatusText },
             ImageValue("Engine effects", "Original keeps the game effects. Reduced removes volumetric lighting/fog and screen-space reflections in VR. Minimal also removes ambient occlusion, bloom and camera blur. Keeps particles, tactical targeting and interface. Compare in the same scene; CPU stalls may remain.",
@@ -185,6 +188,7 @@ namespace RTMaquetaXR
             ImageToggle("Stable HUD geometry", "Keep panel geometry fixed while moving your head or zooming the table. Reduces repeated Canvas work without lowering HUD resolution. Turn off for a live comparison; maps keep their registered projection.", () => _cfg.stableHudCapture, value => _cfg.stableHudCapture = value),
             ImageToggle("Separate unit indicators", "Update each unit indicator separately. May reduce CPU work but increase draw calls and pointing cost. Off by default. Compare in the same combat view.", () => _cfg.isolateOvertipBatches, value => _cfg.isolateOvertipBatches = value),
             ImageToggle("Reduce monitor rendering", "Reuse one eye image for the monitor instead of drawing the world again. Can reduce work in VR. Both eyes continue to render separately.", () => _cfg.skipDesktopWorld, value => _cfg.skipDesktopWorld = value),
+            ImageToggle("Monitor copy comparison", "Session-only measurement: omit the eye copy and clear the window while retaining the selected world-render policy. Use with traces enabled; turn off after comparing.", () => _monitorCopyProbe81, value => _monitorCopyProbe81 = value),
             ImageValue("Allow game FSR", "Allow the game FSR setting to affect both eyes. May reduce detail to save GPU time. Suspended while DLSS, DLAA or NVIDIA Diagnostic is active.", () =>
                 ModLocalization.Text(!_cfg.allowGameFsr ? "Off" : _cfg.neuralMode != 0 ? "Allowed; suspended with NVIDIA" : "Allowed"),
                 direction => { _cfg.allowGameFsr = !_cfg.allowGameFsr; MarkSettingsDirty(); ResetPerformanceWindow(); }),

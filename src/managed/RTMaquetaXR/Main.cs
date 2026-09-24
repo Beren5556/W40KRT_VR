@@ -33,7 +33,7 @@ namespace RTMaquetaXR
     {
         // Hardcoded in the source, so it travels with the compiled DLL. The load line logs this next to
         // Info.json's Version; if the two disagree in the log, the running DLL is stale (rebuild needed).
-        const string BuildTag = "0.9.80";
+        const string BuildTag = "0.9.81";
         static ModDiagnosticLog _log;
         static string _settingsPath;
         static readonly string[] _presetPaths = new string[3];                       // one snapshot file per slot
@@ -126,6 +126,10 @@ namespace RTMaquetaXR
             public bool touchThirdPersonFollow = true;
             public bool touchFollowRecenter = false;
             public float modMenuOffsetX = 0, modMenuOffsetY = 0;
+            public float modMenuDistance81 = .75f;
+            public InterfaceGroupSettings81 dialogLayout81 = new InterfaceGroupSettings81();
+            public InterfaceGroupSettings81 largeTutorialLayout81 = InterfaceGroupSettings81.LargeTutorialDefault();
+            public InterfaceGroupSettings81 tipLayout81 = new InterfaceGroupSettings81();
             public bool touchContextHints = false;
             public float touchHintX = 0, touchHintY = 0, touchHintSize = 1f;
             public int controlsLayoutRevision = 0;
@@ -175,7 +179,8 @@ namespace RTMaquetaXR
             public bool disableAA = false;     // Off mode; otherwise temporalAA selects TAA or SMAA.
             public int neuralMode = 0;         // Off / shadow diagnostics / DLAA / DLSS.
             public float neuralScale = .67f;
-            public int neuralPreset = 0;       // Auto / explicit K.
+            public int neuralPreset = 0;       // NVIDIA preset ID; legacy 1 migrates to K.
+            public bool monitorImage = true;
             public float neuralSharpness = .2f;
             public float taaSharpness = 0.35f;   // Native TAA sharpening, independent of FSR/render scale.
             public bool allowGameFsr = true;
@@ -586,7 +591,7 @@ namespace RTMaquetaXR
         static void ParseInto(Settings cfg, string[] lines)
         {
             cfg.uiPos.Clear();
-            bool loadedTemporalAa = false, loadedDisableAa = false;
+            bool loadedTemporalAa = false, loadedDisableAa = false, loadedNeuralModel81 = false;
             foreach (var raw in lines)
             {
                 var line = raw.Trim();
@@ -641,7 +646,9 @@ namespace RTMaquetaXR
                 else if (key == "disableAA" && bool.TryParse(val, out var noaa)) { cfg.disableAA = noaa; loadedDisableAa = true; }
                 else if (key == "neuralMode" && int.TryParse(val, out var neural)) cfg.neuralMode = Mathf.Clamp(neural, 0, 3);
                 else if (key == "neuralScale" && float.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out var ns) && !float.IsNaN(ns)) cfg.neuralScale = Mathf.Clamp(ns, .5f, 1f);
-                else if (key == "neuralPreset" && int.TryParse(val, out var np)) cfg.neuralPreset = Mathf.Clamp(np, 0, 1);
+                else if (key == "neuralPreset" && int.TryParse(val, out var np) && !loadedNeuralModel81) cfg.neuralPreset = NeuralPresets81.Legacy(np);
+                else if (key == "neuralModel81" && int.TryParse(val, out var np81)) { cfg.neuralPreset = NeuralPresets81.Normalize(np81); loadedNeuralModel81 = true; }
+                else if (key == "monitorImage" && bool.TryParse(val, out var mi81)) cfg.monitorImage = mi81;
                 else if (key == "neuralSharpness" && float.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out var nsh) && !float.IsNaN(nsh)) cfg.neuralSharpness = Mathf.Clamp01(nsh);
                 else if (key == "taaSharpness" && float.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out var ts) && !float.IsNaN(ts)) cfg.taaSharpness = Mathf.Clamp01(ts);
                 else if (key == "allowGameFsr" && bool.TryParse(val, out var fsr)) cfg.allowGameFsr = fsr;
@@ -657,6 +664,10 @@ namespace RTMaquetaXR
                 else if (key == "touchFollowRecenter" && bool.TryParse(val, out var tr80)) cfg.touchFollowRecenter = tr80;
                 else if (key == "openXrRuntimeManifest80") cfg.openXrRuntimeManifest80 = val;
                 else if (key == "modMenuOffsetX" && float.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out var mx80)) cfg.modMenuOffsetX = mx80;
+                else if (key == "modMenuDistance81" && float.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out var md81)) cfg.modMenuDistance81 = md81;
+                else if (key == "dialogLayout81") cfg.dialogLayout81 = InterfaceGroupSettings81.Decode(val, cfg.dialogLayout81);
+                else if (key == "largeTutorialLayout81") cfg.largeTutorialLayout81 = InterfaceGroupSettings81.Decode(val, cfg.largeTutorialLayout81);
+                else if (key == "tipLayout81") cfg.tipLayout81 = InterfaceGroupSettings81.Decode(val, cfg.tipLayout81);
                 else if (key == "modMenuOffsetY" && float.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out var my80)) cfg.modMenuOffsetY = my80;
                 else if (key == "openXrRuntime" && int.TryParse(val, out var oxr)) cfg.openXrRuntime = OpenXrRuntimeSelection.Normalize(oxr);
                 else if (key == "modLanguage" && int.TryParse(val, out var ml)) cfg.modLanguage = Math.Max(-1, Math.Min(1, ml));
@@ -700,6 +711,7 @@ namespace RTMaquetaXR
             cfg.uiMenuOffsetY = TouchPointerMath.Finite(cfg.uiMenuOffsetY) ? Mathf.Clamp(cfg.uiMenuOffsetY, -.65f, .65f) : ApprovedUserDefaults.MenuY;
             SpatialPanelSettings.Normalize(cfg);
             cfg.modMenuOffsetX = PanelFit80.Offset(cfg.modMenuOffsetX);
+            cfg.modMenuDistance81 = InterfaceGroupSettings81.Bound(cfg.modMenuDistance81, .5f, 3, .75f);
             cfg.modMenuOffsetY = PanelFit80.Offset(cfg.modMenuOffsetY);
             cfg.engineEffectProfile = EngineEffectPolicy.Normalize(cfg.engineEffectProfile);
             cfg.uiAspect = !TouchPointerMath.Finite(cfg.uiAspect) ? ApprovedUserDefaults.Aspect : cfg.uiAspect <= 0 ? 0 : HudPanelLayout.ClampAspect(cfg.uiAspect);
@@ -725,7 +737,7 @@ namespace RTMaquetaXR
             s += "touchGestureHelp=" + cfg.touchGestureHelp + "\ntouchHandsVisible=" + cfg.touchHandsVisible + "\n";
             s += ComfortCameraOptions.Serialize(cfg.comfort);
             s += "neuralMode=" + cfg.neuralMode + "\n";
-            s += "neuralScale=" + cfg.neuralScale.ToString("R", c) + "\nneuralPreset=" + cfg.neuralPreset + "\nneuralSharpness=" + cfg.neuralSharpness.ToString("R", c) + "\n";
+            s += "neuralScale=" + cfg.neuralScale.ToString("R", c) + "\nneuralModel81=" + cfg.neuralPreset + "\nneuralSharpness=" + cfg.neuralSharpness.ToString("R", c) + "\n";
             s += "taaSharpness=" + cfg.taaSharpness.ToString("R", CultureInfo.InvariantCulture) + "\n";
             s += "visibleRegionCulling=" + cfg.visibleRegionCulling + "\n";
             s += "indirectVisibleRegionCulling=" + cfg.indirectVisibleRegionCulling + "\n";
@@ -735,9 +747,12 @@ namespace RTMaquetaXR
             s += "drawDistanceCustom=" + cfg.drawDistanceCustom.ToString("R", CultureInfo.InvariantCulture) + "\n";
             s += "touchDrawDistanceShortcut=" + cfg.touchDrawDistanceShortcut + "\n";
             s += "touchThirdPersonFollow=" + cfg.touchThirdPersonFollow + "\n";
+            s += "monitorImage=" + cfg.monitorImage + "\n";
             s += "touchFollowRecenter=" + cfg.touchFollowRecenter + "\n";
             s += "openXrRuntimeManifest80=" + (cfg.openXrRuntimeManifest80 ?? "").Replace("\r", "").Replace("\n", "") + "\n";
             s += "modMenuOffsetX=" + cfg.modMenuOffsetX.ToString("R", CultureInfo.InvariantCulture) + "\n";
+            s += "modMenuDistance81=" + cfg.modMenuDistance81.ToString("R", c) + "\n";
+            s += "dialogLayout81=" + cfg.dialogLayout81.Encode() + "\nlargeTutorialLayout81=" + cfg.largeTutorialLayout81.Encode() + "\ntipLayout81=" + cfg.tipLayout81.Encode() + "\n";
             s += "modMenuOffsetY=" + cfg.modMenuOffsetY.ToString("R", CultureInfo.InvariantCulture) + "\n";
             s += "adaptiveDistance=" + cfg.adaptiveDistance + "\n";
             s += "uiAspect=" + cfg.uiAspect.ToString("R", CultureInfo.InvariantCulture) + "\n";
@@ -1041,6 +1056,7 @@ namespace RTMaquetaXR
 
         static void StopVr()
         {
+            RestoreManagementText81();
             ReleaseManagementBackdrop66();
             ReleaseNativeWorldUi66();
             RestoreNativeHintPlacement();
@@ -2316,6 +2332,7 @@ namespace RTMaquetaXR
 
         static void RestoreHudCanvases()
         {
+            RestoreNativeGroups81();
             RestoreSurfaceDialogLayout72();
             StopPcHudPresentation();
             RestoreHudViewportMasks();
@@ -2524,6 +2541,7 @@ namespace RTMaquetaXR
             {
                 if (s.canvas == null) continue;
                 var tr = s.canvas.transform;
+                if(IndependentGroupOwns81(tr))continue;
                 if (!c0Set) { c0Before = tr.position; c0Set = true; } live++;   // 0.6.48 diag
                 if (s.canvas.name == "FadeCanvas")
                 {

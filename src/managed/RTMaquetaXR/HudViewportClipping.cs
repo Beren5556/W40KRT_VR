@@ -43,6 +43,9 @@ namespace RTMaquetaXR
 
         static HudViewportMask HudViewportFor(Transform item)
         {
+            // These native panels now have independent VR placement. The old
+            // desktop edge must not slice them; their own scroll/text masks stay.
+            if (IndependentGroupOwns81(item)) return null;
             // World indicators are physically outside the panel by design.
             // Exclude their branch before _overtipsRoot has even been resolved,
             // and keep map marker registration independent of panel layout.

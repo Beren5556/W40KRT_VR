@@ -6,9 +6,9 @@
 #define RTN_API extern "C" __declspec(dllimport)
 #endif
 
-// Windows x64 ABI v1. C# uses LayoutKind.Sequential, Pack=8, pointer fields IntPtr.
+// Windows x64 ABI v2. C# uses LayoutKind.Sequential, Pack=8, pointer fields IntPtr.
 // All calls are CPU-only except the returned Unity render-event callback.
-enum : uint32_t { RTN_ABI_VERSION=1, RTN_EVENT_EVALUATE=1, RTN_EVENT_MAINTENANCE=2 };
+enum : uint32_t { RTN_ABI_VERSION=2, RTN_EVENT_EVALUATE=1, RTN_EVENT_MAINTENANCE=2 };
 enum : uint32_t { RTN_MODE_DLAA=0, RTN_MODE_QUALITY=1, RTN_MODE_BALANCED=2, RTN_MODE_PERFORMANCE=3, RTN_MODE_ULTRA_PERFORMANCE=4 };
 enum : uint32_t { RTN_FEATURE_HDR=1, RTN_FEATURE_DEPTH_INVERTED=2, RTN_FEATURE_MV_LOW_RES=4, RTN_FEATURE_MV_JITTERED=8, RTN_FEATURE_AUTO_EXPOSURE=16, RTN_FEATURE_FORCE_PRESET_K=32, RTN_FEATURE_COLOR_SRGB=64 };
 enum : uint32_t { RTN_JOB_RESET=1, RTN_JOB_PRESENT=2 }; // No PRESENT bit means shadow evaluation.
@@ -25,6 +25,7 @@ struct RTN_Config {
  uint32_t mode, featureFlags;
  const wchar_t* featureDirectory; // Copied absolute search-directory hint. NGX may select an NVIDIA override.
  const wchar_t* logPath; // Copied by Configure; can be null.
+ uint32_t requestedPreset, reserved; // Auto=0, J-M=10..13. Removed/reserved presets rejected. Reserved must be zero.
 };
 struct RTN_Job {
  uint32_t size, abi;
@@ -62,7 +63,7 @@ struct RTN_RuntimeStatus {
  wchar_t path[1024],message[256];
 };
 #pragma pack(pop)
-static_assert(sizeof(RTN_Config)==40,"RTN_Config ABI");
+static_assert(sizeof(RTN_Config)==48,"RTN_Config ABI");
 static_assert(sizeof(RTN_Job)==160,"RTN_Job ABI");
 static_assert(sizeof(RTN_JobStatus)==56,"RTN_JobStatus ABI");
 static_assert(sizeof(RTN_BackendStatus)==72,"RTN_BackendStatus ABI");

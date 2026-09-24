@@ -7,7 +7,7 @@ namespace RTMaquetaXR
     // bounded Touch camera; Libre/Confort preferences have no effect.
     public sealed class ComfortCameraSettings
     {
-        public float touchTurnSpeed = 1f;
+        public float touchTurnSpeed = 1.4f;
         public float touchGestureTurnSpeed = 1.1f;
         public float touchZoomSpeed = 1.1f;
         public float touchMoveSpeed = 1.1f;

@@ -140,7 +140,7 @@ namespace RTMaquetaXR
                 if (mode == 0) { Detach(); return true; }
                 requestedMode = mode; // Retain the request on failure: never silently select TAA.
                 if (float.IsNaN(inputScale) || inputScale < 0.5f || inputScale > 1) throw new ArgumentOutOfRangeException(nameof(inputScale));
-                if (preset != 0 && preset != 1 && preset != 11) throw new ArgumentOutOfRangeException(nameof(preset));
+                if (!NeuralPresets81.Valid(preset)) throw new ArgumentOutOfRangeException(nameof(preset));
                 if (mode == 3 && (outputSize.x <= 0 || outputSize.y <= 0)) throw new InvalidOperationException("DLSS output size is not set");
                 if (!installed) throw new InvalidOperationException("Neural hooks are not installed");
                 if (SystemInfo.graphicsDeviceType != GraphicsDeviceType.Direct3D11) throw new InvalidOperationException("Neural path requires D3D11");
@@ -163,7 +163,7 @@ namespace RTMaquetaXR
                 if (configured || stopping || pendingTickets.Count != 0)
                 { NeuralNative.RTN_RequestShutdown(); stopping = true; }
                 requestedMode = mode; runtimeDirectory = directory; nativeLogPath = logPath;
-                requestedScale = mode == 3 ? inputScale : 1; requestedPreset = preset == 0 ? 0 : 11;
+                requestedScale = mode == 3 ? inputScale : 1; requestedPreset = preset;
                 SetSharpness(sharpness);
                 faulted = false; lastError = null; configured = false; ++generation;
                 ResetHistory();
@@ -408,7 +408,6 @@ namespace RTMaquetaXR
                 // HDR describes that NGX input, independently of the original LDR encoding.
                 uint flags = NeuralNative.Hdr | NeuralNative.LowResolutionMotion | NeuralNative.AutoExposure;
                 if (color.Descriptor.sRGB) flags |= NeuralNative.ColorSrgb;
-                if (requestedPreset == 11) flags |= NeuralNative.ForcePresetK;
                 if (SystemInfo.usesReversedZBuffer) flags |= NeuralNative.ReversedDepth;
                 ConfigureNative(flags);
                 bool reset = resetPending[capture.Eye] || previousCameras[capture.Eye] != capture.Camera;
@@ -536,7 +535,7 @@ namespace RTMaquetaXR
             {
                 if (!string.IsNullOrEmpty(nativeLogPath)) logPath = Marshal.StringToHGlobalUni(nativeLogPath);
                 uint nativeMode = requestedMode != 3 || requestedScale >= 0.999f ? 0u : requestedScale >= 0.63f ? 1u : requestedScale >= 0.56f ? 2u : 3u;
-                var config = new NeuralNative.Config { size = 40, abi = NeuralNative.Abi, generation = generation, mode = nativeMode, featureFlags = flags, featureDirectory = directory, logPath = logPath };
+                var config = new NeuralNative.Config { size = 48, requestedPreset = (uint)requestedPreset, abi = NeuralNative.Abi, generation = generation, mode = nativeMode, featureFlags = flags, featureDirectory = directory, logPath = logPath };
                 if (NeuralNative.RTN_Configure(ref config) != 1) throw new InvalidOperationException(NativeFailureMessage("Native configuration rejected"));
                 configuredFlags = flags; configured = true;
             }
@@ -639,9 +638,9 @@ namespace RTMaquetaXR
             if (!EffectivePresentedRecent) return ModLocalization.Format("{0}: waiting for confirmed presentation", mode);
             string identified = presetStatus.generation == generation && presetStatus.evidence != 0 ?
                 PresetName(presetStatus.identifiedLeft) + "/" + PresetName(presetStatus.identifiedRight) : ModLocalization.Text("unidentified");
-            return ModLocalization.Format("{0} active {1}x{2} -> {3}x{4} | {5} -> {6}", mode, lastInputSize[0].x, lastInputSize[0].y, lastOutputSize[0].x, lastOutputSize[0].y, requestedPreset == 0 ? "Auto" : "K", identified);
+            return ModLocalization.Format("{0} active {1}x{2} -> {3}x{4} | {5} -> {6}", mode, lastInputSize[0].x, lastInputSize[0].y, lastOutputSize[0].x, lastOutputSize[0].y, NeuralPresets81.Name(requestedPreset), identified);
         }
-        static string PresetName(uint value) => value == 11 ? "K" : value == 13 ? "M" : value == uint.MaxValue ? "?" : value.ToString();
+        static string PresetName(uint value) => value == uint.MaxValue ? "?" : NeuralPresets81.Name((int)value);
 
         internal static object Snapshot() => new {
             Installed = installed, RequestedMode = requestedMode, Faulted = faulted, LastError = lastError,

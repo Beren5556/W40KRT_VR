@@ -51,11 +51,12 @@ namespace RTMaquetaXR
             return new ViewPose(desiredHead.position - rotation.Rotate(offset) * scale, rotation);
         }
         internal static float CloseDistance(float height, float radius, float scale)
+            => GroupDistance(height, radius, scale) * .75f;
+        internal static float GroupDistance(float height, float radius, float scale)
         {
             if (!ComfortCameraOptions.Finite(height) || !ComfortCameraOptions.Finite(radius) || !ComfortCameraOptions.Finite(scale)) return 0;
             return Math.Max(Math.Max(.8f, height) * 3.0f, Math.Max(scale * .95f, Math.Max(0, radius) * 2.6f));
         }
-        internal static float GroupDistance(float height, float radius, float scale) => CloseDistance(height, radius, scale);
         internal static Point3 BodySize(Point3 visualSize)
         {
             // Ground auras, weapons and stale culling bounds are not bodies.

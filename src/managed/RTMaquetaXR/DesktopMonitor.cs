@@ -12,12 +12,16 @@ namespace RTMaquetaXR
         static int _stereoPreparedFrame = -1, _desktopSkippedFrame = -1, _desktopHandledFrame = -1;
         static readonly DesktopMirrorRecovery _desktopRecovery = new DesktopMirrorRecovery();
         static int _desktopWorldSkips, _desktopCopies;
+        static int _desktopCopyFrame81 = -1, _desktopClearFrame81 = -1;
+        internal static bool MonitorHeadsetRecovery81 { get; private set; }
+        static bool MonitorWorldSkip81 => !_cfg.monitorImage || _cfg.skipDesktopWorld;
+        static bool MonitorRecoveryBlocks81 => _cfg.monitorImage && !_monitorCopyProbe81 && _desktopFallback;
 
         internal static void BeginStereoPreparation() { _stereoPreparedFrame = -1; }
         internal static void MarkStereoPrepared() { _stereoPreparedFrame = Time.frameCount; }
         static bool SkipDesktopWorld(Camera camera)
         {
-            if (!_active || !_attached || _modeFlat || !_cfg.skipDesktopWorld || !_desktopMirrorHook || _desktopFallback ||
+            if (!_active || !_attached || _modeFlat || MonitorHeadsetRecovery81 || !MonitorWorldSkip81 || !_desktopMirrorHook || MonitorRecoveryBlocks81 ||
                 _stereoPreparedFrame != Time.frameCount || camera == null || camera != _attachedCam || camera.targetTexture != null)
                 return false;
             if (!DesktopBackbufferAvailable())
@@ -29,7 +33,7 @@ namespace RTMaquetaXR
         }
         static void CopyEyeToDesktop(ScriptableRenderContext context, List<Camera> cameras)
         {
-            if (!_active || !_attached || _modeFlat || !_cfg.skipDesktopWorld || !_desktopMirrorHook ||
+            if (!_cfg.monitorImage || _monitorCopyProbe81 || !_active || !_attached || _modeFlat || !_cfg.skipDesktopWorld || !_desktopMirrorHook ||
                 _desktopSkippedFrame != Time.frameCount || _desktopHandledFrame == Time.frameCount) return;
             bool screenSafe = _attachedCam != null && _attachedCam.targetTexture == null && DesktopBackbufferAvailable();
             bool completePair = _runner != null && BothEyesRendered(_runner.GetEyeL(), _runner.GetEyeR(), Time.frameCount);
@@ -49,10 +53,17 @@ namespace RTMaquetaXR
                 try
                 {
                     GL.sRGBWrite = QualitySettings.activeColorSpace == ColorSpace.Linear;
-                    Graphics.Blit(eye, (RenderTexture)null, new Vector2(1, fraction), new Vector2(0, (1 - fraction) * 0.5f));
+                    using (var commands = new CommandBuffer { name = "RTVR monitor copy" })
+                    {
+                        MonitorGpuMark81(commands, _lastBeginTiming.serial, 1);
+                        commands.Blit(eye, BuiltinRenderTextureType.CameraTarget, new Vector2(1, fraction), new Vector2(0, (1 - fraction) * .5f));
+                        MonitorGpuMark81(commands, _lastBeginTiming.serial, 2);
+                        Graphics.ExecuteCommandBuffer(commands);
+                    }
                 }
                 finally { RenderTexture.active = previousTarget; GL.sRGBWrite = previousSrgb; }
-                ++_desktopCopies; _desktopRecovery.Copied(); RecordModStage("MonitorCopy", started);
+                ++_desktopCopies; _desktopCopyFrame81 = Time.frameCount; _desktopRecovery.Copied(); RecordModStage("MonitorCopy", started);
+                if(started!=0)_monitorCopyCpu81=(Stopwatch.GetTimestamp()-started)*1000.0/Stopwatch.Frequency;
             }
             catch (Exception e)
             {
@@ -73,7 +84,7 @@ namespace RTMaquetaXR
             // Called at WaitForEndOfFrame, once the existing submission path
             // has verified both eyes. Nested render contexts cannot consume a
             // frame's recovery observation before its eyes have rendered.
-            if (!_desktopFallback) return;
+            if (!_desktopFallback || !_cfg.monitorImage) return;
             bool eligible = stereo && _active && _attached && !_modeFlat && _cfg.skipDesktopWorld &&
                 _desktopMirrorHook && _stereoPreparedFrame == Time.frameCount;
             bool screenSafe = eligible && _attachedCam != null && _attachedCam.targetTexture == null && DesktopBackbufferAvailable();

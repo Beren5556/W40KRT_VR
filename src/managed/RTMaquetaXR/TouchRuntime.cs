@@ -270,6 +270,11 @@ namespace RTMaquetaXR
                 }
             }
             // Panel windows keep first refusal at the actual panel coordinate.
+            if(_pickCam!=null&&IndependentPointer81(hudRay,out var independentPoint))
+            {
+                var screen=_pickCam.WorldToScreenPoint(independentPoint);
+                if(screen.z>0)_touchScreen=new Vector2(screen.x,screen.y);
+            }
             // Never retarget a window's captured down/up onto the world behind it.
             FindTouchUiTarget(true);
             bool panelHit=_touchOverUi&&_touchTarget!=null&&!IsWorldHudTransform(_touchTarget.transform);

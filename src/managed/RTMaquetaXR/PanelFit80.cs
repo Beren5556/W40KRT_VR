@@ -4,7 +4,7 @@ namespace RTMaquetaXR
     internal struct PanelPlacement80 { internal float X, Y, Width, Height; internal bool Limited; }
     internal static class PanelFit80
     {
-        internal static float Offset(float value) => Finite(value) ? Math.Max(-.4f, Math.Min(.4f, value)) : 0;
+        internal static float Offset(float value) => Finite(value) ? Math.Max(-.65f, Math.Min(.65f, value)) : 0;
         internal static bool Fit(float depth, float width, float height, float x, float y,
             HudFrustumPlane[] planes, out PanelPlacement80 result)
         {

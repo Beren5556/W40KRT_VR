@@ -5,8 +5,8 @@ using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 using RTMaquetaXR;
-[assembly:System.Reflection.AssemblyVersion("0.9.80.0")]
-[assembly:System.Reflection.AssemblyFileVersion("0.9.80.0")]
+[assembly:System.Reflection.AssemblyVersion("0.9.81.0")]
+[assembly:System.Reflection.AssemblyFileVersion("0.9.81.0")]
 [assembly:System.Reflection.AssemblyProduct("W40KRT VR Launcher")]
 namespace RogueTraderLauncher
 {
@@ -25,7 +25,7 @@ namespace RogueTraderLauncher
         Icon gameIcon;
         internal Launcher80()
         {
-            Text="W40KRT VR · Launcher 0.9.80";StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
+            Text="W40KRT VR · Launcher 0.9.81";StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.Dpi;
             ClientSize=new Size(900,840);MinimumSize=new Size(820,760);Font=new Font("Segoe UI",14);BackColor=Color.FromArgb(245,247,250);
             var table=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(24),ColumnCount=3,RowCount=13,AutoScroll=true};
             table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,145));table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,108));

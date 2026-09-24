@@ -24,15 +24,9 @@ namespace RTMaquetaXR
             mask.SetSiblingIndex(sibling);
             rect.SetParent(mask,false);rect.anchorMin=rect.anchorMax=Vector2.zero;rect.pivot=Vector2.zero;
             rect.anchoredPosition=new Vector2(-strip,0);rect.sizeDelta=new Vector2(width,height);rect.localScale=Vector3.one;
-            var bounds=state.Speaker.Bounds;
-            var upper=DialogArtMask76("Speaker parchment edge",state.Speaker.Rect,new Vector2(bounds.xMax,bounds.yMin),new Vector2(strip,height),state);
-            var copy=new GameObject("Original parchment continuation",typeof(RectTransform),typeof(CanvasRenderer),typeof(Image));
-            copy.layer=art.gameObject.layer;copy.transform.SetParent(upper,false);
-            var imageCopy=copy.GetComponent<Image>();imageCopy.sprite=art.sprite;imageCopy.color=art.color;imageCopy.material=art.material;
-            imageCopy.raycastTarget=false;
-            var cr=imageCopy.rectTransform;cr.anchorMin=cr.anchorMax=Vector2.zero;cr.pivot=Vector2.zero;cr.anchoredPosition=Vector2.zero;cr.sizeDelta=new Vector2(width,height);
-            state.Speaker.Bounds=Rect.MinMaxRect(bounds.xMin,bounds.yMin,bounds.xMax+strip,bounds.yMax);
-            bounds=state.Answers.Bounds;
+            // The original upper panel already supplies its complete right edge.
+            // Moving the lower fragment there produces a duplicate edge.
+            var bounds=state.Answers.Bounds;
             state.Answers.Bounds=Rect.MinMaxRect(bounds.xMin+strip,bounds.yMin,bounds.xMax,bounds.yMax);
         }
         static RectTransform DialogArtMask76(string name,Transform parent,Vector2 localPosition,Vector2 size,SurfaceDialogState72 state)

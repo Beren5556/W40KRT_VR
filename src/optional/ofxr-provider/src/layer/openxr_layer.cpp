@@ -4084,6 +4084,8 @@ enum class GenerationPrepareReason : std::int64_t {
     manual_disarmed = 17,
     structural_quarantine_active = 18,
     synthesis_busy = 19,
+    host_frame_ineligible = 20,
+    neural_frame_incompatible = 21,
 };
 
 [[nodiscard]] constexpr GenerationPrepareReason classify_synthesis_failure(
@@ -4894,7 +4896,8 @@ XrResult layer_end_frame_impl(
         };
 
     const auto host_frame77=xrfg::host77::snapshot();
-    const bool host_eligible77=end_info&&xrfg::host77::eligible(host_frame77,end_info->displayTime)&&xrfg::host77::neural_compatible(host_frame77);
+    const bool descriptor_eligible77=end_info&&xrfg::host77::eligible(host_frame77,end_info->displayTime);
+    const bool host_eligible77=descriptor_eligible77&&xrfg::host77::neural_compatible(host_frame77);
     if(state->host_epoch77!=host_frame77.epoch||!host_eligible77) {
         const XrResult exclusive_result=enter_presenter_exclusive();
         if(XR_FAILED(exclusive_result))return exclusive_result;
@@ -4902,7 +4905,7 @@ XrResult layer_end_frame_impl(
         {std::scoped_lock lock(state->presenter_mutex);state->presenter_last_frame.reset();}
         state->host_epoch77=host_frame77.epoch;
     }
-    if(!host_eligible77)return bypass_generation(GenerationPrepareReason::empty_mappings);
+    if(!host_eligible77)return bypass_generation(descriptor_eligible77?GenerationPrepareReason::neural_frame_incompatible:GenerationPrepareReason::host_frame_ineligible);
 
     bool generation_cooling_down = false;
     bool structural_quarantine_active = false;

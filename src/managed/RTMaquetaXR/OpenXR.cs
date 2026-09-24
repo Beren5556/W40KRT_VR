@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Text;
 using System.Runtime.InteropServices;
@@ -92,6 +92,10 @@ namespace RTMaquetaXR
     internal static class OpenXR
     {
         const string Library = "RTMaquetaBridge.dll";
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        internal struct MonitorGpuTiming81 { public ulong Serial; public int Kind, Valid; public double Milliseconds; }
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern IntPtr RTX_GetMonitorEvent81();
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int RTX_ReadMonitorTimings81([Out] MonitorGpuTiming81[] samples, int capacity);
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] static extern int RTX_SelectRuntime(int runtime);
         [DllImport("kernel32", CharSet = CharSet.Unicode, SetLastError = true)]
         static extern IntPtr LoadLibraryEx(string path, IntPtr reserved, uint flags);
@@ -108,6 +112,8 @@ namespace RTMaquetaXR
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] static extern int RTX_SetHudFrame(ulong serial,
             IntPtr black, IntPtr white, float width, float height, float distance, float x, float y, int linear);
         internal static bool HudCompositorAvailable => initialized && RTX_GetHudStatus() >= 0;
+        [DllImport(Library,CallingConvention=CallingConvention.Cdecl)] static extern int RTX_GetUiLimits81(out int layers,out int width,out int height);
+        internal static bool GetUiLimits81(out int layers,out int width,out int height)=>RTX_GetUiLimits81(out layers,out width,out height)==1;
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] static extern int RTX_GetSpatialStatus();
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] static extern int RTX_SetSpatialFrame(ulong serial,
             IntPtr black, IntPtr white, XrPose pose, float width, float height, int linear);

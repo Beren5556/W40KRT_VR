@@ -43,6 +43,7 @@ namespace RTMaquetaXR
             internal Vector3 SpeakerScale75,AnswersScale75;
             internal int Language=-1,ContentSignature;
             internal bool Applied;
+            internal RectTransform Backdrop81;
         }
         static readonly Dictionary<Canvas,SurfaceDialogState72> _surfaceDialogs72=new Dictionary<Canvas,SurfaceDialogState72>();
         static readonly HashSet<Canvas> _dialogPending75=new HashSet<Canvas>();
@@ -111,9 +112,10 @@ namespace RTMaquetaXR
             // The native dialog canvas is a 451-unit HIGH horizontal bar, not
             // the headset viewport. Fitting two rows into that bar halves all
             // text and portrait sizes. Use the complete logical HUD surface.
-            Vector2 size=_hudReferenceSize;
+            Vector2 size=IndependentDialogueSize81(_hudReferenceSize);
+            if(_cfg.dialogLayout81.Aspect>0)size.x=size.y*_cfg.dialogLayout81.Aspect;
             if(state.ScrollButton75?.Rect!=null)state.ScrollButton75.Rect.localScale=Vector3.zero;
-            if(state.Applied&&state.Viewport==size&&viewport.sizeDelta==size&&state.Language==ModLocalization.Revision&&state.ContentSignature==signature&&
+            if(state.Applied&&state.Viewport==size&&viewport.rect.size==size&&state.Language==ModLocalization.Revision&&state.ContentSignature==signature&&
                 state.Speaker.Rect.parent==viewport&&state.Answers.Rect.parent==viewport&&
                 state.Speaker.Rect.anchoredPosition==state.SpeakerPosition75&&state.Answers.Rect.anchoredPosition==state.AnswersPosition75&&
                 state.Speaker.Rect.localScale==state.SpeakerScale75&&state.Answers.Rect.localScale==state.AnswersScale75)return;
@@ -124,7 +126,11 @@ namespace RTMaquetaXR
             // canvas/raycast bounds. Give the real dialog root the same logical
             // HUD extent used for layout; its original geometry is retained in
             // Root and restored when VR stops.
-            viewport.sizeDelta=size;
+            // sizeDelta is an offset for stretched native anchors, not the
+            // actual viewport size. Preserve those anchors without doubling
+            // the panel extent or undoing the independent group's geometry.
+            viewport.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal,size.x);
+            viewport.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical,size.y);
             float width=Mathf.Max(a.Bounds.width,b.Bounds.width);
             float speakerFactor=1,answerFactor=1;
             float speakerHeight=a.Bounds.height*speakerFactor,answerHeight=b.Bounds.height*answerFactor,gap=-18;
@@ -140,6 +146,7 @@ namespace RTMaquetaXR
             LayoutRebuilder.ForceRebuildLayoutImmediate(a.Rect);LayoutRebuilder.ForceRebuildLayoutImmediate(b.Rect);
             state.SpeakerPosition75=a.Rect.anchoredPosition;state.AnswersPosition75=b.Rect.anchoredPosition;
             state.SpeakerScale75=a.Rect.localScale;state.AnswersScale75=b.Rect.localScale;
+            PlaceDialogueBackdrop81(state,width*scale,(speakerHeight+answerHeight+gap)*scale);
             state.Applied=true;
             if(DiagnosticsRecording)_log.Log("[dialog72] Native stacked panels: speaker="+a.Rect.name+" answers="+b.Rect.name+
                 " width="+width+" heights="+speakerHeight+"/"+answerHeight+" scale="+scale+" viewport="+size);

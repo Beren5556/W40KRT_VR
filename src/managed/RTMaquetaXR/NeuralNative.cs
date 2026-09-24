@@ -6,7 +6,7 @@ namespace RTMaquetaXR
     internal static class NeuralNative
     {
         internal const string Library = "RTNeural.dll";
-        internal const uint Abi = 1, EvaluateEvent = 1, MaintenanceEvent = 2;
+        internal const uint Abi = 2, EvaluateEvent = 1, MaintenanceEvent = 2;
         internal const uint Hdr = 1, ReversedDepth = 2, LowResolutionMotion = 4, AutoExposure = 16, ForcePresetK = 32, ColorSrgb = 64;
         internal const uint Reset = 1, Present = 2;
 
@@ -17,6 +17,7 @@ namespace RTMaquetaXR
             internal ulong generation;
             internal uint mode, featureFlags;
             internal IntPtr featureDirectory, logPath;
+            internal uint requestedPreset, reserved;
         }
         [StructLayout(LayoutKind.Sequential, Pack = 8)]
         internal struct Job
@@ -64,7 +65,7 @@ namespace RTMaquetaXR
         }
         internal static void CheckAbi()
         {
-            if (IntPtr.Size != 8 || Marshal.SizeOf(typeof(Config)) != 40 || Marshal.SizeOf(typeof(Job)) != 160 ||
+            if (IntPtr.Size != 8 || Marshal.SizeOf(typeof(Config)) != 48 || Marshal.SizeOf(typeof(Job)) != 160 ||
                 Marshal.SizeOf(typeof(JobStatus)) != 56 || Marshal.SizeOf(typeof(BackendStatus)) != 72 || Marshal.SizeOf(typeof(PresetStatus)) != 32 ||
                 Marshal.SizeOf(typeof(RuntimeStatus)) != 2608)
                 throw new InvalidOperationException("Neural ABI size mismatch");

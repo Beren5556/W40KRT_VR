@@ -123,6 +123,7 @@ namespace RTMaquetaXR
                     IncludeHudHelperDepth(ref helperDepth, _touchPointerRoot, _touchOverUi && !_touchWorldHit68 && _touchReticleShown, captureHead, forward);
                     IncludeHudHelperDepth(ref helperDepth, _touchRadialRoot, _touchRadialShown, captureHead, forward);
                     IncludeTouchRadialBoundsDepth(ref helperDepth, captureHead, forward);
+                    IncludeNativeGroupDepth81(ref helperDepth, captureHead, forward);
                 }
                 IncludeHudHelperDepth(ref helperDepth, _worldInformationRoot70, _worldInformationVisible70, captureHead, forward);
                 float captureFar = HudCapturePolicy.FarClip(_hudCaptureGeometry.Distance,

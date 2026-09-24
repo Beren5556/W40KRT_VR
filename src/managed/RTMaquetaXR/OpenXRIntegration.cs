@@ -81,6 +81,7 @@ namespace RTMaquetaXR
             // teardown. Temporary pauses/load overlays do not destroy resources.
             if (surface == PresentationSurface.Panel && _attached) SuspendForTransition("intentional menu / prerecorded video panel");
             if (mainMenu && !loading) _presentationSceneMode = null;
+            UpdateManagementText81();
         }
         static bool GameplayMode(string mode)
         {

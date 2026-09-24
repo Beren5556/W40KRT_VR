@@ -66,7 +66,7 @@ namespace RTMaquetaXR
         }
 
         static bool IsHudPanelTransform(Transform transform) => _attached && _pickCam != null &&
-            _uiRoot != null && transform != null && transform.IsChildOf(_uiRoot);
+            transform != null && ((_uiRoot != null && transform.IsChildOf(_uiRoot)) || IndependentGroupOwns81(transform));
 
         static bool HudCanvasShown(string name) => _cfg.uiEnabled || name == "FadeCanvas";
 
